@@ -1,0 +1,157 @@
+/* ====== Layout ====== */
+.course-layout {
+  display: flex;
+  height: 100vh;
+  font-family: "Segoe UI", sans-serif;
+  background-color: #f5f7fb;
+}
+
+/* ====== Left Panel ====== */
+.left-panel {
+  width: 40%;
+  padding: 2rem;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #f5f9ff, #ffffff);
+}
+
+/* Scrollbar Styling */
+.left-panel::-webkit-scrollbar {
+  width: 8px;
+}
+.left-panel::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+.left-panel::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.25);
+}
+
+/* ====== Right Panel ====== */
+.right-panel {
+  flex-grow: 1;
+  padding: 2rem;
+  background-color: #fff;
+  overflow-y: auto;
+}
+
+/* ====== Titles ====== */
+.course-title {
+  font-size: 1.9rem;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  background: linear-gradient(90deg, #007bff, #00a2ff);
+  /* -webkit-background-clip: text; */
+  -webkit-text-fill-color: transparent;
+}
+
+/* ====== Accordion Modules ====== */
+.accordion-section {
+  margin-bottom: 1rem;
+}
+
+.module-box {
+  padding: 1rem 1.2rem;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 500;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s ease;
+}
+
+.module-box:hover {
+  background-color: #eaf3ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+}
+
+.module-box.active {
+  background-color: #cce4ff;
+  border-color: #3399ff;
+  box-shadow: 0 4px 14px rgba(0, 123, 255, 0.25);
+}
+
+/* ====== Topic List Animation ====== */
+.topic-list-container {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.3s ease;
+  opacity: 0;
+}
+
+.topic-list-container.expanded {
+  max-height: 400px; /* adjust as needed */
+  opacity: 1;
+}
+
+/* ====== Topics ====== */
+.topic-box {
+  margin: 0.5rem 0 0.5rem 1rem;
+  padding: 0.8rem 1rem;
+  background-color: #fdfdfd;
+  border-left: 4px solid #bbb;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.25s ease;
+}
+
+.topic-box:hover {
+  background-color: #eef5ff;
+  transform: translateX(4px);
+}
+
+.topic-box.active {
+  background-color: #ddefff;
+  border-left-color: #3399ff;
+  font-weight: 600;
+}
+
+/* ====== Right Panel Topic Details ====== */
+.topic-details {
+  animation: fadeSlideUp 0.4s ease forwards;
+}
+
+.topic-details h2 {
+  font-size: 1.7rem;
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.topic-details p {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #444;
+}
+
+/* ====== Placeholder ====== */
+.placeholder-text {
+  font-size: 1.1rem;
+  color: #888;
+  margin-top: 2rem;
+  text-align: center;
+}
+
+/* ====== Animations ====== */
+@keyframes fadeSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.course-layout {
+  display: flex;
+  height: 100vh; /* full height */
+  overflow: hidden;
+}
+
+.right-panel {
+  flex-grow: 1; /* take remaining space */
+  overflow-y: auto;
+}

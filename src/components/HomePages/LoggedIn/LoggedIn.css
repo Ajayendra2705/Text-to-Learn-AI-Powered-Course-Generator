@@ -1,0 +1,48 @@
+.page-container {
+  min-height: 100vh;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.loggedin-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;  /* stack from top */
+  padding: 30px 18px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  color: #1f2937;
+  box-sizing: border-box;
+  overflow: visible;
+  scrollbar-width: none;
+}
+
+html, body {
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  background-color: #f0f4f8; /* fallback for older browsers */
+}
+
+/* Hide scrollbar on WebKit browsers (Chrome, Safari, Edge) */
+body::-webkit-scrollbar,
+.loggedin-container::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Hide scrollbar on Firefox */
+body {
+  scrollbar-width: none !important;
+  -moz-scrollbars-none: none;
+}

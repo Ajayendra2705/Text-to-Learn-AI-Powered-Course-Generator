@@ -1,0 +1,108 @@
+:root {
+  --left-panel-width: 40%;
+}
+
+/* Left Panel */
+.left-panel {
+  width: var(--left-panel-width);
+  padding: 2rem;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #f5f9ff, #ffffff);
+  transition: width 0.1s ease;
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* Dragger Handle */
+.drag-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.drag-handle:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Title & Description */
+.course-title {
+  font-size: 1.9rem;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  background: linear-gradient(90deg, #007bff, #00a2ff);
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important; /* fallback for other browsers */
+}
+
+.course-description {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+.loading-text {
+  color: #777;
+}
+
+/* Accordion */
+.accordion-section {
+  margin-bottom: 1rem;
+}
+
+.module-box {
+  padding: 1rem 1.2rem;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.module-box:hover {
+  background-color: #eaf3ff;
+}
+
+.module-box.active {
+  background-color: #cce4ff;
+  border-color: #3399ff;
+}
+
+/* Topics */
+.topic-list-container {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease;
+}
+
+.topic-list-container.expanded {
+  max-height: 300px;
+}
+
+.topic-box {
+  margin: 0.5rem 0 0.5rem 1rem;
+  padding: 0.8rem 1rem;
+  background-color: #fdfdfd;
+  border-left: 4px solid #bbb;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.topic-box:hover {
+  background-color: #eef5ff;
+}
+
+.topic-box.active {
+  background-color: #ddefff;
+  border-left-color: #3399ff;
+  font-weight: 600;
+}

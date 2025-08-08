@@ -1,0 +1,38 @@
+.courses-wrapper {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 equal columns */
+  gap: 28px;
+  width: 100%;
+  max-width: 1280px;
+  padding: 0 12px 24px;
+  margin: 0 auto;
+  scrollbar-width: none; /* Hide scrollbar on Firefox */
+}
+
+.courses-wrapper::-webkit-scrollbar {
+  display: none; /* Hide scrollbar on WebKit browsers */
+}
+
+/* Responsive tweaks */
+@media (max-width: 1200px) {
+  .courses-wrapper {
+    max-width: 980px;
+    gap: 22px;
+  }
+}
+
+@media (max-width: 900px) {
+  .courses-wrapper {
+    grid-template-columns: repeat(2, 1fr); /* 2 columns on medium screens */
+    max-width: 680px;
+    gap: 18px;
+  }
+}
+
+@media (max-width: 650px) {
+  .courses-wrapper {
+    grid-template-columns: 1fr; /* 1 column on small screens */
+    max-width: 99vw;
+    gap: 12px;
+  }
+}

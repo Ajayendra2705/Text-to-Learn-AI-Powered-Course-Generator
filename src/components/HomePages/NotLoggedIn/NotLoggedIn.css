@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Poppins', sans-serif;
+}
+
+.home-page {
+  background: url('/public/bg_image.jpg') center center / cover no-repeat;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: white;
+  position: relative;
+}
+
+.hero {
+  margin-top: 6rem;
+  padding: 0 1.5rem;
+
+  /* Center content horizontally */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.typing-text {
+  font-size: 2.3rem;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  animation: typing 2.8s steps(35, end) forwards;
+
+  /* Center fix */
+  display: block;
+  width: max-content;
+  margin: 0 auto;
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 35ch; }
+}
+
+.hero p {
+  font-size: 1.2rem;
+  margin-top: 1rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  opacity: 0.95;
+}
+
+.animated-image {
+  margin: 3rem auto 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffffcc;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+  animation: glowPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes glowPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.7);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  }
+}
+
+.footer {
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 0.8rem 0;
+  backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.35);
+  color: #f8fafc;
+  font-weight: 400;
+  box-shadow: 0 -1px 4px rgba(255,255,255,0.1);
+}
+
+/* ============================= */
+/* Responsive adjustments below */
+/* ============================= */
+
+/* Tablets (768px and below) */
+@media (max-width: 768px) {
+  .typing-text {
+    font-size: 1.8rem;
+    animation: typing 2.8s steps(25, end) forwards;
+  }
+
+  .hero p {
+    font-size: 1rem;
+  }
+
+  .animated-image {
+    width: 18px;
+    height: 18px;
+    margin-top: 2rem;
+  }
+}
+
+/* Mobile phones (480px and below) */
+@media (max-width: 480px) {
+  .home-page {
+    justify-content: flex-start;
+    padding-top: 4rem;
+    text-align: center;
+  }
+
+  .hero {
+    margin-top: 3rem;
+    padding: 0 1rem;
+  }
+
+  .typing-text {
+    font-size: 1.4rem;
+    animation: typing 2.8s steps(20, end) forwards;
+  }
+
+  .hero p {
+    font-size: 0.95rem;
+  }
+
+  .animated-image {
+    width: 16px;
+    height: 16px;
+    margin-top: 2rem;
+  }
+
+  .footer {
+    font-size: 0.75rem;
+    padding: 0.6rem 0;
+  }
+}
