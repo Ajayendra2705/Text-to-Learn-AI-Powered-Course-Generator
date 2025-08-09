@@ -4,7 +4,12 @@ const axios = require("axios");
 require("dotenv").config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    "https://text-to-learn-ai-powered-course-gen.vercel.app",
+    "http://localhost:3000"
+  ]
+}));
 app.use(express.json());
 
 const COHERE_API_KEY = process.env.COHERE_API_KEY;
