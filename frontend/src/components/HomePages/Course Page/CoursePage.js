@@ -15,11 +15,12 @@ function CoursePage() {
   const [topicLoading, setTopicLoading] = useState(false);
   const [panelWidth, setPanelWidth] = useState(40); 
 
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
   useEffect(() => {
     async function fetchCourseOutline() {
       setLoading(true);
       try {
-        const response = await fetch("http://localhost:5000/generate_course", {
+        const response = await fetch(`${API_BASE_URL}/generate_course`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userInput: label })
@@ -62,7 +63,7 @@ function CoursePage() {
 
     setTopicLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/generate_topic", {
+      const response = await fetch(`${API_BASE_URL}/generate_topic`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic: topic.title })

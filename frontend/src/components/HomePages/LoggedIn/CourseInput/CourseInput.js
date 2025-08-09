@@ -4,8 +4,7 @@ import "./CourseInput.css";
 function CourseInput({ inputText, setInputText, onAdd }) {
   const [loading, setLoading] = useState(false);
 
-  // Use environment variable for backend URL fallback to localhost for dev
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
