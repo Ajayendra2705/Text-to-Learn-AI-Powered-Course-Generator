@@ -29,7 +29,6 @@ function LeftPanel({
   const handleMouseMove = (e) => {
     if (!isDragging.current) return;
     const newWidthPercent = (e.clientX / window.innerWidth) * 100;
-    // Clamp between 20% and 70%
     if (newWidthPercent >= 0 && newWidthPercent <= 100) {
       setPanelWidth(newWidthPercent);
     }
@@ -46,36 +45,33 @@ function LeftPanel({
 
   return (
     <div
-      className="left-panel"
+      id="left-panel"
       style={{ width: `${panelWidth}%` }}
     >
-      <h2 className="course-title">{courseData.title}</h2>
-      <p className="course-description">{courseData.description}</p>
+      <h2 id="course-title">{courseData.title}</h2>
+      <p id="course-description">{courseData.description}</p>
 
       {loading ? (
-        <p className="loading-text">Loading modules...</p>
+        <p id="loading-text">Loading modules...</p>
       ) : (
         courseData.modules.map((module, index) => (
-          <div key={index} className="accordion-section">
+          <div key={index} id="accordion-section">
             <div
-              className={`module-box ${
-                expandedModuleIndex === index ? "active" : ""
-              }`}
+              id={`module-box-${index}`}
+              className={expandedModuleIndex === index ? "active" : ""}
               onClick={() => toggleModule(index)}
             >
               {module.name}
             </div>
             <div
-              className={`topic-list-container ${
-                expandedModuleIndex === index ? "expanded" : ""
-              }`}
+              id={`topic-list-container-${index}`}
+              className={expandedModuleIndex === index ? "expanded" : ""}
             >
               {module.topics.map((topic, i) => (
                 <div
                   key={i}
-                  className={`topic-box ${
-                    selectedTopic?.title === topic.title ? "active" : ""
-                  }`}
+                  id={`topic-box-${index}-${i}`}
+                  className={selectedTopic?.title === topic.title ? "active" : ""}
                   onClick={() => handleTopicClick(index, i)}
                 >
                   {topic.title}
@@ -86,9 +82,8 @@ function LeftPanel({
         ))
       )}
 
-      {/* Dragger */}
       <div
-        className="drag-handle"
+        id="drag-handle"
         onMouseDown={startDragging}
         role="separator"
         aria-orientation="vertical"

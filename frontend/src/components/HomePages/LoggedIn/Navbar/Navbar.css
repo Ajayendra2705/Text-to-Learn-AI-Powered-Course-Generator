@@ -1,7 +1,5 @@
-/* Navbar.css */
 .navbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   background-color: #1e1e2f;
   padding: 1rem 2rem;
@@ -15,17 +13,47 @@
   margin: 0;
 }
 
-.get-started-btn {
+/* Container holding the buttons aligned right */
+.navbar-buttons {
+  display: flex;
+  gap: 0.6rem; /* smaller gap for close buttons */
+  margin-left: auto; /* push container to the right */
+  align-items: center;
+}
+
+.get-started-btn,
+.logout-btn {
   background-color: #4f46e5;
   color: white;
   border: none;
   padding: 0.6rem 1.2rem;
   font-size: 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.4);
+  transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+  user-select: none;
 }
 
-.get-started-btn:hover {
+.get-started-btn:hover,
+.logout-btn:hover,
+.get-started-btn:focus,
+.logout-btn:focus {
   background-color: #4338ca;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(67, 56, 202, 0.6);
+  outline: none;
+}
+
+/* Red style for logout */
+.logout-btn {
+  background-color: #e53e3e;
+  box-shadow: 0 4px 10px rgba(229, 62, 62, 0.4);
+}
+
+.logout-btn:hover,
+.logout-btn:focus {
+  background-color: #9b2c2c;
+  box-shadow: 0 6px 15px rgba(155, 44, 44, 0.6);
 }

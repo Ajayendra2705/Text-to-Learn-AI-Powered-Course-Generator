@@ -1,21 +1,18 @@
-:root {
-  --left-panel-width: 40%;
-}
-
-/* Left Panel */
-.left-panel {
-  width: var(--left-panel-width);
+#left-panel {
+  width: 40%;
   padding: 2rem;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid #22242f;
   overflow-y: auto;
-  background: linear-gradient(180deg, #f5f9ff, #ffffff);
+  background: linear-gradient(180deg, #121217, #0a0a0f) !important; /* Force dark */
+  color: #bbbfc7;
   transition: width 0.1s ease;
   position: relative;
   box-sizing: border-box;
+  height: 100vh;
 }
 
 /* Dragger Handle */
-.drag-handle {
+#drag-handle {
   position: absolute;
   top: 0;
   right: 0;
@@ -24,85 +21,90 @@
   cursor: col-resize;
   background-color: transparent;
   transition: background-color 0.2s ease;
+  box-shadow: inset -2px 0 4px rgba(255, 255, 255, 0.03);
+  z-index: 10;
 }
 
-.drag-handle:hover {
-  background-color: rgba(0, 0, 0, 0.1);
+#drag-handle:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Title & Description */
-.course-title {
+#course-title {
   font-size: 1.9rem;
   margin-bottom: 1.5rem;
   font-weight: 600;
-  background: linear-gradient(90deg, #007bff, #00a2ff);
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  color: transparent !important; /* fallback for other browsers */
+  background: linear-gradient(90deg, #3a70c1, #2266ee);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.course-description {
+#course-description {
   font-size: 1rem;
-  color: #666;
+  color: #7a7e8a;
   margin-bottom: 1.5rem;
+  line-height: 1.4;
 }
 
-.loading-text {
-  color: #777;
+#loading-text {
+  color: #666;
 }
 
-/* Accordion */
-.accordion-section {
-  margin-bottom: 1rem;
-}
-
-.module-box {
+/* Module box */
+[id^="module-box-"] {
   padding: 1rem 1.2rem;
-  background-color: #fff;
-  border: 1px solid #ccc;
+  background-color: #1c1e2b;
+  border: 1px solid #22242f;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
+  color: #bbbfc7;
   transition: all 0.3s ease;
 }
 
-.module-box:hover {
-  background-color: #eaf3ff;
+[id^="module-box-"]:hover {
+  background-color: #1a1c29;
 }
 
-.module-box.active {
-  background-color: #cce4ff;
-  border-color: #3399ff;
+[id^="module-box-"].active {
+  background-color: #2c2f4a;
+  border-color: #2266ee;
+  color: white;
+  box-shadow: 0 0 8px #2266ee;
 }
 
 /* Topics */
-.topic-list-container {
+[id^="topic-list-container-"] {
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.4s ease;
 }
 
-.topic-list-container.expanded {
+[id^="topic-list-container-"].expanded {
   max-height: 300px;
 }
 
-.topic-box {
+[id^="topic-box-"] {
   margin: 0.5rem 0 0.5rem 1rem;
   padding: 0.8rem 1rem;
-  background-color: #fdfdfd;
-  border-left: 4px solid #bbb;
+  background-color: #12131f;
+  border-left: 4px solid #3a3f5c;
   cursor: pointer;
   border-radius: 4px;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, border-color 0.2s;
+  color: #bbbfc7;
 }
 
-.topic-box:hover {
-  background-color: #eef5ff;
+[id^="topic-box-"]:hover {
+  background-color: #23263f;
+  border-left-color: #2266ee;
 }
 
-.topic-box.active {
-  background-color: #ddefff;
-  border-left-color: #3399ff;
+[id^="topic-box-"].active {
+  background-color: #34487c;
+  border-left-color: #2266ee;
   font-weight: 600;
+  color: white;
+  box-shadow: 0 0 6px #2266ee;
 }

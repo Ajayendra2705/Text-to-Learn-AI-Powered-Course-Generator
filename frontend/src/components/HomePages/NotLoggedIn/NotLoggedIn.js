@@ -14,26 +14,39 @@ function NotLoggedIn() {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [pause, setPause] = useState(false);
 
   useEffect(() => {
+    if (pause) {
+      // Pause for 800ms before deleting or moving on
+      const pauseTimeout = setTimeout(() => setPause(false), 800);
+      return () => clearTimeout(pauseTimeout);
+    }
+
     const currentPhrase = phrases[phraseIndex];
-    const speed = isDeleting ? 30 : 60;
+    const speed = isDeleting ? 25 : 50;
 
     const timeout = setTimeout(() => {
       if (!isDeleting) {
+        // Typing forward
         const nextText = currentPhrase.slice(0, charIndex + 1);
         setText(nextText);
-        setCharIndex((prev) => prev + 1);
+        setCharIndex(charIndex + 1);
 
         if (nextText === currentPhrase) {
-          setTimeout(() => setIsDeleting(true), 1200);
+          // Pause at full phrase before deleting
+          setPause(true);
+          setIsDeleting(true);
         }
       } else {
+        // Deleting
         const nextText = currentPhrase.slice(0, charIndex - 1);
         setText(nextText);
-        setCharIndex((prev) => prev - 1);
+        setCharIndex(charIndex - 1);
 
         if (nextText === "") {
+          // Pause before next phrase typing
+          setPause(true);
           setIsDeleting(false);
           setPhraseIndex((prev) => (prev + 1) % phrases.length);
         }
@@ -41,7 +54,7 @@ function NotLoggedIn() {
     }, speed);
 
     return () => clearTimeout(timeout);
-  }, [charIndex, isDeleting, phraseIndex]);
+  }, [charIndex, isDeleting, phraseIndex, pause]);
 
   return (
     <motion.div
