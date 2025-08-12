@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import "./CourseInput.css";
 
+const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
+
 function CourseInput({ inputText, setInputText, onAdd }) {
   const [loading, setLoading] = useState(false);
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
@@ -19,7 +20,7 @@ function CourseInput({ inputText, setInputText, onAdd }) {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/generate_name`, { // <-- fixed path
+      const response = await fetch(`${BACKEND_URL}/api/generate_name`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -28,7 +29,7 @@ function CourseInput({ inputText, setInputText, onAdd }) {
       });
 
       const data = await response.json();
-      console.log(`Backend gave: ${JSON.stringify(data)}`);
+
       if (response.ok && data?.suggestion) {
         onAdd(data.suggestion);
       } else {
@@ -53,8 +54,9 @@ function CourseInput({ inputText, setInputText, onAdd }) {
         onChange={(e) => setInputText(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={loading}
+        aria-label="Course name input"
       />
-      <button onClick={handleAdd} disabled={loading}>
+      <button onClick={handleAdd} disabled={loading} aria-label="Add course">
         {loading ? "Generating..." : "Add"}
       </button>
     </div>

@@ -7,48 +7,49 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
   const [error, setError] = useState(null);
   const [expandedModules, setExpandedModules] = useState({}); // Track expanded modules
 
-  useEffect(() => {
-    if (!courseTitle) return;
+useEffect(() => {
+  if (!courseTitle) return;
 
-    // Try cached modules first
-    const cached = localStorage.getItem(`modules_${courseTitle}`);
-    if (cached) {
-      setModules(JSON.parse(cached));
-      return;
+  const cached = localStorage.getItem(`modules_${courseTitle}`);
+  if (cached) {
+    setModules(JSON.parse(cached));
+    return;
+  }
+
+  const fetchAndSaveOutline = async () => {
+    setLoading(true);
+    setError(null);
+    const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/generate_outline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseTitle }),
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch modules");
+
+      const data = await response.json();
+      setModules(data.modules || []);
+      localStorage.setItem(`modules_${courseTitle}`, JSON.stringify(data.modules || []));
+
+      // Optional backend save (can remove if unnecessary)
+      await fetch(`${BACKEND_URL}/api/saved_courses/save_outline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseName: courseTitle, topics: data.modules }),
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const fetchAndSaveOutline = async () => {
-      setLoading(true);
-      setError(null);
+  fetchAndSaveOutline();
+}, [courseTitle]);
 
-      try {
-        const response = await fetch("http://localhost:5000/api/generate_outline", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ courseTitle }),
-        });
-
-        if (!response.ok) throw new Error("Failed to fetch modules");
-
-        const data = await response.json();
-        setModules(data.modules || []);
-        localStorage.setItem(`modules_${courseTitle}`, JSON.stringify(data.modules || []));
-
-        // Optional backend save (can remove if unnecessary)
-        await fetch("http://localhost:5000/api/saved_courses/save_outline", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ courseName: courseTitle, topics: data.modules }),
-        });
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAndSaveOutline();
-  }, [courseTitle]);
 
   // Toggle expanded/collapsed state for a module index
   const toggleModule = (index) => {

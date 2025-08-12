@@ -15,7 +15,10 @@ const app = express();
 // CORS setup
 app.use(
   cors({
-    origin: "http://localhost:3000", // React frontend URL
+    origin: [
+      "http://localhost:3000", // local dev frontend
+      "https://text-to-learn-ai-powered-course-gen.vercel.app", // deployed frontend URL
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

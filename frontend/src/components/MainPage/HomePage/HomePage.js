@@ -7,13 +7,15 @@ import CourseList from "../CourseList/CourseList";
 import { useNavigate } from "react-router-dom";
 import "./HomePage.css";
 
+const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
+
 function HomePage() {
   const [user, setUser] = useState(null);
   const [courses, setCourses] = useState([]);
   const [inputText, setInputText] = useState("");
   const navigate = useNavigate();
 
-  // Listen for auth state change on mount
+  // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -21,10 +23,10 @@ function HomePage() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch user's courses from DB only once logged in
+  // Fetch user's courses once logged in
   useEffect(() => {
     if (user?.uid) {
-      fetch(`http://localhost:5000/api/courses/${user.uid}`)
+      fetch(`${BACKEND_URL}/api/courses/${user.uid}`)
         .then((res) => res.json())
         .then((data) => setCourses(data))
         .catch((err) => console.error("Error fetching courses:", err));
@@ -36,7 +38,7 @@ function HomePage() {
       const trimmedCourse = suggestion.trim();
 
       try {
-        const res = await fetch("http://localhost:5000/api/courses", {
+        const res = await fetch(`${BACKEND_URL}/api/courses`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -51,7 +53,7 @@ function HomePage() {
         }
 
         const newCourse = await res.json();
-        setCourses((prev) => [...prev, newCourse]); // keep Mongo _id and title
+        setCourses((prev) => [...prev, newCourse]); // Append new course
         setInputText("");
       } catch (error) {
         console.error("Error saving course to DB:", error);
@@ -61,7 +63,7 @@ function HomePage() {
 
   const handleDeleteCourse = async (courseId) => {
     try {
-      await fetch(`http://localhost:5000/api/courses/${courseId}`, {
+      await fetch(`${BACKEND_URL}/api/courses/${courseId}`, {
         method: "DELETE",
       });
       setCourses((prev) => prev.filter((course) => course._id !== courseId));

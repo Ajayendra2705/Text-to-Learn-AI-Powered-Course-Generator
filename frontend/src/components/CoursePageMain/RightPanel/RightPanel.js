@@ -6,37 +6,39 @@ export default function RightPanel({ selectedSubmodule }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!selectedSubmodule) {
-      setDetails(null);
-      return;
+useEffect(() => {
+  if (!selectedSubmodule) {
+    setDetails(null);
+    return;
+  }
+
+  const fetchTopicDetails = async () => {
+    setLoading(true);
+    setError(null);
+    setDetails(null);
+
+    const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/topic_details`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: selectedSubmodule }),
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch topic details");
+
+      const data = await res.json();
+      setDetails(data);
+    } catch (err) {
+      setError(err.message || "Error fetching topic details");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const fetchTopicDetails = async () => {
-      setLoading(true);
-      setError(null);
-      setDetails(null);
-
-      try {
-        const res = await fetch("http://localhost:5000/api/topic_details", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ topic: selectedSubmodule }),
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch topic details");
-
-        const data = await res.json();
-        setDetails(data);
-      } catch (err) {
-        setError(err.message || "Error fetching topic details");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTopicDetails();
-  }, [selectedSubmodule]);
+  fetchTopicDetails();
+}, [selectedSubmodule]);
 
   if (!selectedSubmodule) {
     return (
