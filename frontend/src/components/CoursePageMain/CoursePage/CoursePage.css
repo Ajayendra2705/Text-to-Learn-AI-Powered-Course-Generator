@@ -1,0 +1,20 @@
+.course-page-container {
+  display: flex;
+  height: 100vh;
+  gap: 0;           /* remove gap between panels */
+  padding: 0;       /* remove container padding */
+  box-sizing: border-box;
+}
+
+.left-panel {
+  flex: 1;
+  overflow-y: auto;
+  border-right: 1px solid #ddd;
+  padding-right: 0; /* remove right padding */
+}
+
+.right-panel {
+  flex: 2;
+  overflow-y: auto;
+  padding-left: 0;  /* remove left padding */
+}
