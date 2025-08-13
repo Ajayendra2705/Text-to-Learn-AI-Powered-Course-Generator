@@ -5,6 +5,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import CourseInput from "../CourseInput/CourseInput";
 import CourseList from "../CourseList/CourseList";
 import { useNavigate } from "react-router-dom";
+import Footer from "../Footer/Footer";
 import "./HomePage.css";
 
 const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
@@ -100,6 +101,7 @@ function HomePage() {
           onClick={(index) => handleCourseClick(courses[index])}
         />
       </div>
+      <Footer />
     </div>
   );
 }

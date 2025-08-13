@@ -1,57 +1,42 @@
 import React, { useEffect, useState } from "react";
-import './LeftPanel.css';
+import "./LeftPanel.css";
 
 export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [expandedModules, setExpandedModules] = useState({}); // Track expanded modules
+  const [expandedModules, setExpandedModules] = useState({});
 
-useEffect(() => {
-  if (!courseTitle) return;
+  useEffect(() => {
+    if (!courseTitle) return;
 
-  const cached = localStorage.getItem(`modules_${courseTitle}`);
-  if (cached) {
-    setModules(JSON.parse(cached));
-    return;
-  }
-
-  const fetchAndSaveOutline = async () => {
-    setLoading(true);
-    setError(null);
     const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
 
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/generate_outline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseTitle }),
-      });
+    const fetchOutline = async () => {
+      setLoading(true);
+      setError(null);
 
-      if (!response.ok) throw new Error("Failed to fetch modules");
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/generate_outline`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ courseTitle }),
+        });
 
-      const data = await response.json();
-      setModules(data.modules || []);
-      localStorage.setItem(`modules_${courseTitle}`, JSON.stringify(data.modules || []));
+        if (!res.ok) throw new Error(`Failed to fetch outline (${res.status})`);
 
-      // Optional backend save (can remove if unnecessary)
-      await fetch(`${BACKEND_URL}/api/saved_courses/save_outline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseName: courseTitle, topics: data.modules }),
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const data = await res.json();
+        setModules(data.modules || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchAndSaveOutline();
-}, [courseTitle]);
+    fetchOutline();
+  }, [courseTitle]);
 
-
-  // Toggle expanded/collapsed state for a module index
   const toggleModule = (index) => {
     setExpandedModules((prev) => ({
       ...prev,
@@ -59,7 +44,6 @@ useEffect(() => {
     }));
   };
 
-  // Handle submodule click without bubbling to module toggle
   const handleSubmoduleClick = (e, submodule) => {
     e.stopPropagation();
     onSelectSubmodule(submodule);
@@ -71,7 +55,9 @@ useEffect(() => {
 
       {loading && <p className="info-text">Loading modules...</p>}
       {error && <p className="error-text">Error: {error}</p>}
-      {!loading && !error && modules.length === 0 && <p className="info-text">No modules found.</p>}
+      {!loading && !error && modules.length === 0 && (
+        <p className="info-text">No modules found.</p>
+      )}
 
       <ul className="modules-list">
         {modules.map((mod, idx) => (
@@ -80,21 +66,30 @@ useEffect(() => {
               role="button"
               tabIndex={0}
               onClick={() => toggleModule(idx)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleModule(idx); }}
+              onKeyDown={(e) =>
+                (e.key === "Enter" || e.key === " ") && toggleModule(idx)
+              }
               aria-expanded={!!expandedModules[idx]}
               className={`module-title ${expandedModules[idx] ? "active" : ""}`}
             >
               {mod.title}
             </strong>
 
-            <ul className={`submodules-list ${expandedModules[idx] ? "expanded" : ""}`}>
+            <ul
+              className={`submodules-list ${
+                expandedModules[idx] ? "expanded" : ""
+              }`}
+            >
               {mod.submodules.map((sub, i) => (
                 <li
                   key={i}
                   role="button"
                   tabIndex={0}
                   onClick={(e) => handleSubmoduleClick(e, sub)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleSubmoduleClick(e, sub); }}
+                  onKeyDown={(e) =>
+                    (e.key === "Enter" || e.key === " ") &&
+                    handleSubmoduleClick(e, sub)
+                  }
                   className="clickable-submodule"
                 >
                   {sub}
