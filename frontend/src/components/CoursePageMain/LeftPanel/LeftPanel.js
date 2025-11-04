@@ -10,7 +10,7 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
   useEffect(() => {
     if (!courseTitle) return;
 
-    const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
+    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
     const fetchOutline = async () => {
       setLoading(true);

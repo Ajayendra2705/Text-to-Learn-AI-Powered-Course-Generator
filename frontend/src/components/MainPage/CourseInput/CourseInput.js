@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import "./CourseInput.css";
 
-const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 function CourseInput({ inputText, setInputText, onAdd }) {
   const [loading, setLoading] = useState(false);

@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import Footer from "../Footer/Footer";
 import "./HomePage.css";
 
-const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 function HomePage() {
   const [user, setUser] = useState(null);

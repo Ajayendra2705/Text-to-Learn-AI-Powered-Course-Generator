@@ -7,8 +7,8 @@ export default function RightPanel({ selectedSubmodule }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const BACKEND_URL = "https://text-to-learn-ai-powered-course.onrender.com";
-  const contentRef = useRef(null); // ✅ Ref for capturing content
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+  const contentRef = useRef(null);
 
   useEffect(() => {
     if (!selectedSubmodule) {
