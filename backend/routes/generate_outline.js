@@ -9,6 +9,7 @@ if (!COHERE_API_KEY) {
   process.exit(1);
 }
 
+// ✅ Function using new Cohere Chat API
 async function generateCourseOutline(courseTitle) {
   const prompt = `
 You are an academic course expert.
@@ -37,15 +38,14 @@ Rules:
 - Provide exactly 6 modules.
 - Each module must have exactly 5 submodules.
 - No extra text, only JSON.
-`;
+`.trim();
 
   try {
     const response = await axios.post(
-      "https://api.cohere.ai/v1/generate",
+      "https://api.cohere.ai/v1/chat",
       {
-        model: "command",
-        prompt,
-        max_tokens: 1200,
+        model: "command-a-03-2025", // ✅ Live model
+        message: prompt, // ✅ Updated field per new API
         temperature: 0.7,
       },
       {
@@ -53,17 +53,22 @@ Rules:
           Authorization: `Bearer ${COHERE_API_KEY}`,
           "Content-Type": "application/json",
         },
-        timeout: 30000,
+        timeout: 30000, // 30 seconds (large output)
       }
     );
 
-    const rawText = response.data?.generations?.[0]?.text?.trim();
+    // ✅ Extract text safely (Cohere Chat format)
+    const rawText =
+      response.data?.text?.trim() ||
+      response.data?.message?.content?.[0]?.text?.trim();
+
     if (!rawText) {
       throw new Error("No text returned from Cohere API");
     }
 
-    console.log("Raw AI response text:", rawText);
+    console.log("📄 Raw AI response text:", rawText);
 
+    // ✅ Extract JSON safely from raw text
     const firstBrace = rawText.indexOf("{");
     const lastBrace = rawText.lastIndexOf("}");
     if (firstBrace === -1 || lastBrace === -1) {
@@ -76,10 +81,11 @@ Rules:
     try {
       parsed = JSON.parse(jsonString);
     } catch (parseErr) {
-      console.error("Failed to parse JSON from AI:", jsonString);
+      console.error("❌ Failed to parse JSON from AI:", jsonString);
       throw parseErr;
     }
 
+    // ✅ Validate JSON structure
     if (!parsed.modules || !Array.isArray(parsed.modules) || parsed.modules.length !== 6) {
       throw new Error("Parsed JSON missing 'modules' array of length 6");
     }
@@ -102,27 +108,28 @@ Rules:
   }
 }
 
+// ✅ POST /api/generate_outline
 router.post("/", async (req, res) => {
   const { courseTitle } = req.body;
 
-  console.log("Received courseTitle:", courseTitle);
+  console.log("📥 Received courseTitle:", courseTitle);
 
   if (!courseTitle || typeof courseTitle !== "string" || !courseTitle.trim()) {
     return res.status(400).json({ error: "Invalid or empty courseTitle provided." });
   }
 
   try {
-    // Check DB first
+    // ✅ Check cached outline in DB
     const existing = await CourseOutline.findOne({ courseTitle: courseTitle.trim() });
     if (existing) {
-      console.log("Found outline in DB, returning cached data.");
+      console.log("✅ Found outline in DB, returning cached data.");
       return res.json({ modules: existing.modules });
     }
 
-    // Not found in DB - call AI and save
+    // ✅ Generate new outline
     const outlineData = await generateCourseOutline(courseTitle.trim());
 
-    // Save to DB
+    // ✅ Save to DB
     const newOutline = new CourseOutline({
       courseTitle: courseTitle.trim(),
       modules: outlineData.modules,
@@ -131,6 +138,7 @@ router.post("/", async (req, res) => {
 
     res.json(outlineData);
   } catch (err) {
+    console.error("❌ Error generating course outline:", err.message);
     res.status(500).json({ error: "Failed to generate course outline." });
   }
 });

@@ -9,7 +9,7 @@ if (!COHERE_API_KEY) {
   process.exit(1); // Stop server early if no key
 }
 
-// Function to generate course name via Cohere API
+// ✅ Function using the new Cohere Chat API + live model
 async function generateCourseName(topic) {
   const prompt = `
 You are an academic course naming expert.
@@ -21,15 +21,16 @@ Rules:
 - Do not include "Introduction to" unless necessary.
 - Make it sound academic yet appealing.
 - Only output JSON, no extra text.
-`;
+`.trim();
 
   try {
     const response = await axios.post(
-      "https://api.cohere.ai/v1/generate",
+      "https://api.cohere.ai/v1/chat",
       {
-        model: "command",
-        prompt,
-        max_tokens: 50,
+        // ✅ Use the current live model (not deprecated)
+        model: "command-a-03-2025",
+        // ✅ Correct field per November 2025 docs
+        message: prompt,
         temperature: 0.7,
       },
       {
@@ -41,13 +42,15 @@ Rules:
       }
     );
 
-    const rawText = response.data?.generations?.[0]?.text?.trim();
+    // ✅ Response extraction (covers both formats)
+    const rawText = response.data?.text?.trim() ||
+                    response.data?.message?.content?.[0]?.text?.trim();
 
     if (!rawText) {
       throw new Error("No text returned from Cohere API");
     }
 
-    // Extract JSON substring from rawText (safe parsing)
+    // ✅ Extract JSON substring safely
     const firstBrace = rawText.indexOf("{");
     const lastBrace = rawText.lastIndexOf("}");
     if (firstBrace === -1 || lastBrace === -1) {
@@ -63,12 +66,12 @@ Rules:
 
     return parsed;
   } catch (err) {
-    console.error("❌ Error calling Cohere API:", err.message);
-    throw err; // propagate error to caller
+    console.error("❌ Error calling Cohere API:", err.response?.data || err.message);
+    throw err;
   }
 }
 
-// POST / (if router mounted at /api/generate_name, this means POST /api/generate_name)
+// POST /api/generate_name
 router.post("/", async (req, res) => {
   const { userInput } = req.body;
 

@@ -9,69 +9,79 @@ if (!COHERE_API_KEY) {
   process.exit(1);
 }
 
+// 🧠 Small helper to safely clean malformed JSON
+function sanitizeJSON(text) {
+  return (
+    text
+      // Remove LaTeX math or backslashes like \( \)
+      .replace(/\\\(/g, "(")
+      .replace(/\\\)/g, ")")
+      // Replace unescaped backslashes
+      .replace(/\\(?!["\\/bfnrtu])/g, "\\\\")
+      // Replace smart quotes
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      // Remove control characters
+      .replace(/[\x00-\x1F\x7F]/g, "")
+  );
+}
+
 async function generateTopicDetails(topic) {
   const prompt = `
-You are an academic content expert.
+You are a university-level content creator specializing in structured educational materials.
 
-Given the topic "${topic}", generate detailed content including:
+Generate detailed, factual, and well-organized content for the topic: "${topic}"
 
-1. Text paragraphs explaining the topic clearly.
-2. A list of relevant YouTube video URLs.
-3. A few MCQs with question, options, and correct answer.
-4. Some extra open-ended questions for deeper learning.
-
-Output ONLY valid JSON in the following format:
-
+Return ONLY valid JSON with this structure:
 {
   "text": [
-    "Paragraph 1 about the topic.",
-    "Paragraph 2 about the topic.",
-    "...more paragraphs..."
+    "3–6 paragraphs explaining the topic clearly in academic tone.",
+    "Include concepts, examples, and real-world relevance."
   ],
   "videos": [
-    "https://youtube.com/example1",
-    "https://youtube.com/example2"
+    "2–4 relevant YouTube links about the topic."
   ],
   "mcqs": [
     {
-      "question": "Sample question?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "answer": "Option B"
+      "question": "Conceptual question?",
+      "options": ["A", "B", "C", "D"],
+      "answer": "Correct option text"
     }
   ],
   "extraQuestions": [
-    "Explain the concept of ...",
-    "Describe how ..."
+    "2–4 open-ended reflective questions"
   ]
 }
 
-No extra text, no explanations, only JSON.
-`;
+Rules:
+- Output ONLY valid JSON — no markdown, commentary, or explanations.
+- Escape all quotes correctly.
+- Avoid LaTeX symbols like \\(, \\), or \\n.
+`.trim();
 
   try {
     const response = await axios.post(
-      "https://api.cohere.ai/v1/generate",
+      "https://api.cohere.ai/v1/chat",
       {
-        model: "command",
-        prompt,
-        max_tokens: 10000,
-        temperature: 0.7,
+        model: "command-a-03-2025",
+        message: prompt,
+        temperature: 0.6,
       },
       {
         headers: {
           Authorization: `Bearer ${COHERE_API_KEY}`,
           "Content-Type": "application/json",
         },
-        timeout: 300000,
+        timeout: 180000,
       }
     );
 
-    const rawText = response.data?.generations?.[0]?.text?.trim();
-    if (!rawText) {
-      throw new Error("No text returned from Cohere API");
-    }
+    const rawText =
+      response.data?.text?.trim() ||
+      response.data?.message?.content?.[0]?.text?.trim();
 
-    // Extract JSON safely
+    if (!rawText) throw new Error("No text returned from Cohere API");
+
     const firstBrace = rawText.indexOf("{");
     const lastBrace = rawText.lastIndexOf("}");
     if (firstBrace === -1 || lastBrace === -1) {
@@ -79,12 +89,13 @@ No extra text, no explanations, only JSON.
     }
 
     const jsonString = rawText.substring(firstBrace, lastBrace + 1);
+    const cleanedJSON = sanitizeJSON(jsonString);
 
     let parsed;
     try {
-      parsed = JSON.parse(jsonString);
+      parsed = JSON.parse(cleanedJSON);
     } catch (parseErr) {
-      console.error("Failed to parse JSON from AI:", jsonString);
+      console.error("❌ Still failed to parse JSON:", cleanedJSON);
       throw parseErr;
     }
 
@@ -103,7 +114,10 @@ No extra text, no explanations, only JSON.
 
     return parsed;
   } catch (err) {
-    console.error("❌ Error calling Cohere API for topic details:", err.response?.data || err.message || err);
+    console.error(
+      "❌ Error calling Cohere API for topic details:",
+      err.response?.data || err.message || err
+    );
     throw err;
   }
 }
@@ -116,7 +130,6 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // Check DB cache first
     const cached = await TopicDetail.findOne({ topic: topic.trim() });
     if (cached) {
       return res.json({
@@ -128,10 +141,8 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Not cached? Call API
     const details = await generateTopicDetails(topic.trim());
 
-    // Save to DB cache
     const newTopicDetail = new TopicDetail({
       topic: topic.trim(),
       text: details.text,
