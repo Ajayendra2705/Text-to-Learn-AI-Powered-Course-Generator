@@ -1,9 +1,11 @@
 const mongoose = require("mongoose");
 
-const courseSchema = new mongoose.Schema({
-  userId: { type: String, required: true },  // associate course with a user
-  title: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now }
-});
+const courseSchema = new mongoose.Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    title: { type: String, required: true },
+  },
+  { timestamps: true } // ✅ adds createdAt automatically
+);
 
 module.exports = mongoose.model("Course", courseSchema);

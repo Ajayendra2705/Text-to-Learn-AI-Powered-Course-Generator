@@ -7,10 +7,11 @@ function CourseList({ courses, onDelete }) {
   return (
     <div className="courses-wrapper">
       {courses.map((course, index) => {
-        const courseName =
-          typeof course === "string"
-            ? course
-            : course.title || course.courseName || "";
+        const isObject = typeof course === "object" && course !== null;
+        const courseId = isObject ? course._id : null;
+        const courseName = isObject
+          ? course.title || course.courseName || ""
+          : course;
 
         const abbreviation = courseName
           .split(" ")
@@ -19,12 +20,12 @@ function CourseList({ courses, onDelete }) {
 
         return (
           <CourseCard
-            key={course._id || index}
-            courseId={course._id} // ✅ Send ID
+            key={courseId || index}
+            courseId={courseId}
             label={courseName}
             abbreviation={abbreviation}
-            gradient={getCourseGradient ? getCourseGradient(index) : "#6a11cb"}
-            onDelete={() => onDelete(index)}
+            gradient={getCourseGradient(index)}
+            onDelete={(id) => id && onDelete(id)}
           />
         );
       })}

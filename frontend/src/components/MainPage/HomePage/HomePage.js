@@ -14,9 +14,10 @@ function HomePage() {
   const [user, setUser] = useState(null);
   const [courses, setCourses] = useState([]);
   const [inputText, setInputText] = useState("");
+  const [loadingCourses, setLoadingCourses] = useState(false);
   const navigate = useNavigate();
 
-  // Listen for auth state changes
+  // ✅ Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -24,55 +25,76 @@ function HomePage() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch user's courses once logged in
+  // ✅ Fetch courses once user is ready
   useEffect(() => {
-    if (user?.uid) {
-      fetch(`${BACKEND_URL}/api/courses/${user.uid}`)
-        .then((res) => res.json())
-        .then((data) => setCourses(data))
-        .catch((err) => console.error("Error fetching courses:", err));
-    }
-  }, [user]);
+    if (!user?.uid) return;
 
-  const handleAddCourse = async (suggestion) => {
-    if (suggestion && suggestion.trim() !== "") {
-      const trimmedCourse = suggestion.trim();
-
+    const fetchCourses = async () => {
+      setLoadingCourses(true);
       try {
-        const res = await fetch(`${BACKEND_URL}/api/courses`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: trimmedCourse,
-            userId: user?.uid || null,
-          }),
-        });
-
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || "Failed to add course");
-        }
-
-        const newCourse = await res.json();
-        setCourses((prev) => [...prev, newCourse]); // Append new course
-        setInputText("");
-      } catch (error) {
-        console.error("Error saving course to DB:", error);
+        const res = await fetch(`${BACKEND_URL}/api/courses/${user.uid}`);
+        const data = await res.json();
+        // ✅ Backend already returns newest first
+        setCourses(data);
+      } catch (err) {
+        console.error("❌ Error fetching courses:", err);
+      } finally {
+        setLoadingCourses(false);
       }
+    };
+
+    fetchCourses();
+  }, [user?.uid]);
+
+  // ✅ Add a course (and prepend locally)
+  const handleAddCourse = async (payload) => {
+    const titleRaw =
+      typeof payload === "string"
+        ? payload
+        : payload?.title || payload?.label || payload?.courseName || "";
+
+    const trimmedCourse = titleRaw.trim();
+    if (!trimmedCourse) return;
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/courses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: trimmedCourse,
+          userId: user?.uid || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to add course");
+      }
+
+      const newCourse = await res.json();
+
+      // ✅ Replace state completely (don’t merge old + backend)
+      setCourses((prev) => [newCourse, ...prev]);
+
+      setInputText("");
+    } catch (error) {
+      console.error("❌ Error saving course to DB:", error);
     }
   };
 
+  // ✅ Delete course
   const handleDeleteCourse = async (courseId) => {
     try {
       await fetch(`${BACKEND_URL}/api/courses/${courseId}`, {
         method: "DELETE",
       });
-      setCourses((prev) => prev.filter((course) => course._id !== courseId));
+      setCourses((prev) => prev.filter((c) => c._id !== courseId));
     } catch (error) {
-      console.error("Error deleting course:", error);
+      console.error("❌ Error deleting course:", error);
     }
   };
 
+  // ✅ Navigate
   const handleCourseClick = (course) => {
     navigate("/course", {
       state: { label: course.title, courseId: course._id },
@@ -89,18 +111,25 @@ function HomePage() {
       <h1 className="welcome-heading">
         Hello, {user.displayName ? user.displayName.split(" ")[0] : "User"}!
       </h1>
+
       <div className="loggedin-container">
         <CourseInput
           inputText={inputText}
           setInputText={setInputText}
           onAdd={handleAddCourse}
         />
-        <CourseList
-          courses={courses}
-          onDelete={(index) => handleDeleteCourse(courses[index]._id)}
-          onClick={(index) => handleCourseClick(courses[index])}
-        />
+
+        {loadingCourses ? (
+          <p className="loading-text">Loading courses...</p>
+        ) : (
+          <CourseList
+            courses={courses}
+            onDelete={handleDeleteCourse}
+            onClick={handleCourseClick}
+          />
+        )}
       </div>
+
       <Footer />
     </div>
   );

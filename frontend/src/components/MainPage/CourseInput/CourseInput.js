@@ -3,7 +3,7 @@ import "./CourseInput.css";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-function CourseInput({ inputText, setInputText, onAdd }) {
+function CourseInput({ inputText, setInputText, onAdd, userId }) {
   const [loading, setLoading] = useState(false);
 
   const handleKeyDown = (e) => {
@@ -20,25 +20,33 @@ function CourseInput({ inputText, setInputText, onAdd }) {
     setLoading(true);
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/generate_name`, {
+      // 🧠 Step 1: Generate a clean course title using AI
+      const genRes = await fetch(`${BACKEND_URL}/api/generate_name`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userInput: trimmed }),
       });
 
-      const data = await response.json();
+      const genData = await genRes.json();
+      const finalTitle = genData?.suggestion || trimmed;
 
-      if (response.ok && data?.suggestion) {
-        onAdd(data.suggestion);
+      // 🧠 Step 2: Save to DB (real MongoDB course object)
+      const saveRes = await fetch(`${BACKEND_URL}/api/courses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, title: finalTitle }),
+      });
+
+      const savedCourse = await saveRes.json();
+      if (saveRes.ok && savedCourse?._id) {
+        onAdd(savedCourse); // ✅ Full object (with _id)
       } else {
-        console.error("API error or invalid response:", data);
-        onAdd(trimmed);
+        console.error("Failed to save course:", savedCourse);
+        onAdd({ title: finalTitle }); // fallback
       }
     } catch (error) {
       console.error("Fetch error:", error);
-      onAdd(trimmed);
+      onAdd({ title: trimmed }); // fallback safe add
     } finally {
       setLoading(false);
       setInputText("");
@@ -54,9 +62,8 @@ function CourseInput({ inputText, setInputText, onAdd }) {
         onChange={(e) => setInputText(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={loading}
-        aria-label="Course name input"
       />
-      <button onClick={handleAdd} disabled={loading} aria-label="Add course">
+      <button onClick={handleAdd} disabled={loading}>
         {loading ? "Generating..." : "Add"}
       </button>
     </div>

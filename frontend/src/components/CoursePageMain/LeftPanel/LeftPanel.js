@@ -24,7 +24,6 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
         });
 
         if (!res.ok) throw new Error(`Failed to fetch outline (${res.status})`);
-
         const data = await res.json();
         setModules(data.modules || []);
       } catch (err) {
@@ -44,13 +43,13 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
     }));
   };
 
-  const handleSubmoduleClick = (e, submodule) => {
+  const handleSubmoduleClick = (e, moduleTitle, submoduleName) => {
     e.stopPropagation();
-    onSelectSubmodule(submodule);
+    onSelectSubmodule({ moduleTitle, submoduleName });
   };
 
   return (
-    <nav id="left-panel" aria-label={`Modules for course ${courseTitle}`}>
+    <nav id="left-panel" aria-label={`${courseTitle}`}>
       <h2 tabIndex={0}>Modules for: {courseTitle}</h2>
 
       {loading && <p className="info-text">Loading modules...</p>}
@@ -85,10 +84,10 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
                   key={i}
                   role="button"
                   tabIndex={0}
-                  onClick={(e) => handleSubmoduleClick(e, sub)}
+                  onClick={(e) => handleSubmoduleClick(e, mod.title, sub)}
                   onKeyDown={(e) =>
                     (e.key === "Enter" || e.key === " ") &&
-                    handleSubmoduleClick(e, sub)
+                    handleSubmoduleClick(e, mod.title, sub)
                   }
                   className="clickable-submodule"
                 >

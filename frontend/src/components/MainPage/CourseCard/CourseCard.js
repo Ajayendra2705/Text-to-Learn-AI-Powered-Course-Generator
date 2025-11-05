@@ -7,36 +7,50 @@ function CourseCard({ courseId, label, gradient, abbreviation, onDelete }) {
   const navigate = useNavigate();
 
   const handleCardClick = () => {
-    navigate("/course", {
-      state: { courseId, label } // ✅ Pass both ID & name
-    });
+    if (courseId)
+      navigate("/course", {
+        state: { courseId, label },
+      });
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    if (!courseId) return;
+    if (window.confirm(`Delete course "${label}"?`)) {
+      onDelete(courseId);
+    }
   };
 
   return (
     <div
       className="course-box"
       onClick={handleCardClick}
-      style={{ cursor: "pointer" }}
+      tabIndex={0}
+      role="button"
+      onKeyDown={(e) => (e.key === "Enter" ? handleCardClick() : null)}
     >
       <div
         className="course-top"
         style={{
           background: gradient,
           color: "#fff",
-          position: "relative"
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0.6rem 0.8rem",
+          borderRadius: "12px 12px 0 0",
         }}
       >
-        <span>{abbreviation}</span>
+        <span className="course-abbreviation">{abbreviation}</span>
         <button
           className="delete-button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
+          onClick={handleDelete}
+          title="Delete this course"
         >
           <FaTrash />
         </button>
       </div>
+
       <div className="course-label">{label}</div>
     </div>
   );

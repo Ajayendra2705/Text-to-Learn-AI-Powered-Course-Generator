@@ -3,7 +3,7 @@ import "./RightPanel.css";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
-export default function RightPanel({ selectedSubmodule }) {
+export default function RightPanel({ selectedItem, courseTitle }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -11,10 +11,12 @@ export default function RightPanel({ selectedSubmodule }) {
   const contentRef = useRef(null);
 
   useEffect(() => {
-    if (!selectedSubmodule) {
+    if (!selectedItem) {
       setDetails(null);
       return;
     }
+
+    const { moduleTitle, submoduleName } = selectedItem;
 
     const fetchDetails = async () => {
       setLoading(true);
@@ -22,36 +24,20 @@ export default function RightPanel({ selectedSubmodule }) {
       setDetails(null);
 
       try {
-        const dbRes = await fetch(
-          `${BACKEND_URL}/api/topic_details/get/${encodeURIComponent(selectedSubmodule)}`
-        );
-
-        if (dbRes.ok) {
-          const dbData = await dbRes.json();
-          setDetails(dbData);
-          setLoading(false);
-          return;
-        }
-
         const aiRes = await fetch(`${BACKEND_URL}/api/topic_details`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ topic: selectedSubmodule }),
+          body: JSON.stringify({
+            topic: submoduleName,
+            moduleName: moduleTitle,
+            courseTitle: courseTitle,
+          }),
         });
 
         if (!aiRes.ok) throw new Error("Failed to fetch topic details");
 
         const aiData = await aiRes.json();
         setDetails(aiData);
-
-        await fetch(`${BACKEND_URL}/api/topic_details/save`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            topic: selectedSubmodule,
-            details: aiData,
-          }),
-        });
       } catch (err) {
         setError(err.message || "Error fetching topic details");
       } finally {
@@ -60,28 +46,19 @@ export default function RightPanel({ selectedSubmodule }) {
     };
 
     fetchDetails();
-  }, [selectedSubmodule]);
+  }, [selectedItem, courseTitle]);
 
-  // ✅ Function to download as PDF
   const downloadPDF = () => {
     const input = contentRef.current;
     if (!input) return;
 
-    // Store original inline style
     const originalStyles = input.style.cssText;
-
-    // Force all text in this section to black
     input.style.color = "black";
-    input.querySelectorAll("*").forEach(el => {
-      el.style.color = "black";
-    });
+    input.querySelectorAll("*").forEach((el) => (el.style.color = "black"));
 
     html2canvas(input, { scale: 2 }).then((canvas) => {
-      // Restore original styles
       input.style.cssText = originalStyles;
-      input.querySelectorAll("*").forEach(el => {
-        el.style.color = "";
-      });
+      input.querySelectorAll("*").forEach((el) => (el.style.color = ""));
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
@@ -102,11 +79,11 @@ export default function RightPanel({ selectedSubmodule }) {
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`${selectedSubmodule}.pdf`);
+      pdf.save(`${submoduleName}.pdf`);
     });
   };
 
-  if (!selectedSubmodule) {
+  if (!selectedItem) {
     return (
       <div id="right-panel">
         <p className="info-text">
@@ -116,9 +93,13 @@ export default function RightPanel({ selectedSubmodule }) {
     );
   }
 
+  const { moduleTitle, submoduleName } = selectedItem;
+
   return (
     <div id="right-panel">
-      <h2>{selectedSubmodule}</h2>
+      <h2>
+        {submoduleName}
+      </h2>
 
       {loading && <p className="loading-text">Loading details...</p>}
       {error && <p className="error-text">{error}</p>}
@@ -130,8 +111,7 @@ export default function RightPanel({ selectedSubmodule }) {
           </button>
 
           <div className="topic-details" ref={contentRef}>
-            {details.text &&
-              details.text.map((para, i) => <p key={i}>{para}</p>)}
+            {details.text?.map((para, i) => <p key={i}>{para}</p>)}
 
             {details.videos?.length > 0 && (
               <>

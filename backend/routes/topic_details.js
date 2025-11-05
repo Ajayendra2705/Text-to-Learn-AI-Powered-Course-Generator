@@ -13,12 +13,12 @@ if (!COHERE_API_KEY) {
 function sanitizeJSON(text) {
   return (
     text
-      // Remove LaTeX math or backslashes like \( \)
+      // Remove LaTeX-style syntax
       .replace(/\\\(/g, "(")
       .replace(/\\\)/g, ")")
-      // Replace unescaped backslashes
+      // Fix unescaped backslashes
       .replace(/\\(?!["\\/bfnrtu])/g, "\\\\")
-      // Replace smart quotes
+      // Normalize smart quotes
       .replace(/[“”]/g, '"')
       .replace(/[‘’]/g, "'")
       // Remove control characters
@@ -26,37 +26,47 @@ function sanitizeJSON(text) {
   );
 }
 
-async function generateTopicDetails(topic) {
+/**
+ * ✅ Generate structured topic details using Cohere Chat API
+ * Adds awareness of course & module context.
+ */
+async function generateTopicDetails(courseTitle, moduleName, topic) {
   const prompt = `
-You are a university-level content creator specializing in structured educational materials.
+You are an academic course content generator.
 
-Generate detailed, factual, and well-organized content for the topic: "${topic}"
+Course: "${courseTitle}"
+Module: "${moduleName}"
+Topic: "${topic}"
 
-Return ONLY valid JSON with this structure:
+Generate comprehensive and structured learning material for this topic as valid JSON only.
+
+Format the output as:
+
 {
   "text": [
-    "3–6 paragraphs explaining the topic clearly in academic tone.",
-    "Include concepts, examples, and real-world relevance."
+    "3–6 complete academic-style paragraphs explaining the topic, including examples, relevance to the module, and key concepts."
   ],
   "videos": [
-    "2–4 relevant YouTube links about the topic."
+    "2–4 real or plausible YouTube video URLs related to this topic."
   ],
   "mcqs": [
     {
-      "question": "Conceptual question?",
-      "options": ["A", "B", "C", "D"],
+      "question": "Conceptual multiple-choice question about the topic?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
       "answer": "Correct option text"
     }
   ],
   "extraQuestions": [
-    "2–4 open-ended reflective questions"
+    "2–4 open-ended discussion or reflective questions for students."
   ]
 }
 
 Rules:
-- Output ONLY valid JSON — no markdown, commentary, or explanations.
-- Escape all quotes correctly.
-- Avoid LaTeX symbols like \\(, \\), or \\n.
+- Output must be valid JSON only (no markdown, no text outside JSON).
+- Escape quotes correctly.
+- Avoid LaTeX syntax like \\( or \\).
+- Do not truncate any JSON fields.
+- Ensure all keys (text, videos, mcqs, extraQuestions) exist.
 `.trim();
 
   try {
@@ -82,11 +92,11 @@ Rules:
 
     if (!rawText) throw new Error("No text returned from Cohere API");
 
+    // ✅ Extract JSON only
     const firstBrace = rawText.indexOf("{");
     const lastBrace = rawText.lastIndexOf("}");
-    if (firstBrace === -1 || lastBrace === -1) {
+    if (firstBrace === -1 || lastBrace === -1)
       throw new Error("Invalid JSON format received from Cohere API");
-    }
 
     const jsonString = rawText.substring(firstBrace, lastBrace + 1);
     const cleanedJSON = sanitizeJSON(jsonString);
@@ -99,6 +109,7 @@ Rules:
       throw parseErr;
     }
 
+    // ✅ Validate structure
     if (
       !parsed.text ||
       !Array.isArray(parsed.text) ||
@@ -122,16 +133,27 @@ Rules:
   }
 }
 
+/**
+ * ✅ POST /api/topic_details
+ * Generates or retrieves cached topic details
+ */
 router.post("/", async (req, res) => {
-  const { topic } = req.body;
+  const { topic, moduleName, courseTitle } = req.body;
 
   if (!topic || typeof topic !== "string" || !topic.trim()) {
     return res.status(400).json({ error: "Invalid or empty topic provided." });
   }
 
   try {
-    const cached = await TopicDetail.findOne({ topic: topic.trim() });
+    // ✅ Check DB cache first
+    const cached = await TopicDetail.findOne({
+      topic: topic.trim(),
+      moduleName: moduleName?.trim() || null,
+      courseTitle: courseTitle?.trim() || null,
+    });
+
     if (cached) {
+      console.log("✅ Found topic details in DB cache");
       return res.json({
         text: cached.text,
         videos: cached.videos,
@@ -141,10 +163,18 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const details = await generateTopicDetails(topic.trim());
+    // ✅ Generate via Cohere
+    const details = await generateTopicDetails(
+      courseTitle?.trim() || "General Course",
+      moduleName?.trim() || "General Module",
+      topic.trim()
+    );
 
+    // ✅ Save to DB with full context
     const newTopicDetail = new TopicDetail({
       topic: topic.trim(),
+      moduleName: moduleName?.trim() || null,
+      courseTitle: courseTitle?.trim() || null,
       text: details.text,
       videos: details.videos,
       mcqs: details.mcqs,
@@ -155,7 +185,7 @@ router.post("/", async (req, res) => {
 
     res.json({ ...details, cached: false });
   } catch (err) {
-    console.error("Error in /api/topic_details:", err);
+    console.error("❌ Error in /api/topic_details:", err.message);
     res.status(500).json({ error: "Failed to generate topic details." });
   }
 });
