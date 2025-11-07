@@ -73,10 +73,12 @@ router.post("/", async (req, res) => {
               });
 
               console.log(`💾 [DB] Saved topic details for "${topic}"`);
-            } catch (err) {
+            } 
+            catch (err) {
               if (err.code === 11000) {
                 console.log(`⚠️ [DB] Duplicate topic skipped: "${topic}"`);
-              } else {
+              } 
+              else {
                 console.error(`❌ [AI] Failed topic "${topic}":`, err.message);
               }
             }
