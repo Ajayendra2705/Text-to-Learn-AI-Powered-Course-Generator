@@ -15,12 +15,12 @@ function CourseInput({ inputText, setInputText, onAdd, userId }) {
 
   const handleAdd = async () => {
     const trimmed = inputText.trim();
-    if (!trimmed) return;
+    if (!trimmed || loading) return;
 
     setLoading(true);
 
     try {
-      // 🧠 Step 1: Generate a clean course title using AI
+      // 🧠 Step 1 — Ask AI for a professional course name
       const genRes = await fetch(`${BACKEND_URL}/api/generate_name`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -30,7 +30,7 @@ function CourseInput({ inputText, setInputText, onAdd, userId }) {
       const genData = await genRes.json();
       const finalTitle = genData?.suggestion || trimmed;
 
-      // 🧠 Step 2: Save to DB (real MongoDB course object)
+      // 🧠 Step 2 — Save to DB
       const saveRes = await fetch(`${BACKEND_URL}/api/courses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -38,18 +38,19 @@ function CourseInput({ inputText, setInputText, onAdd, userId }) {
       });
 
       const savedCourse = await saveRes.json();
+
       if (saveRes.ok && savedCourse?._id) {
-        onAdd(savedCourse); // ✅ Full object (with _id)
+        onAdd(savedCourse);
       } else {
-        console.error("Failed to save course:", savedCourse);
+        console.error("⚠️ Failed to save course:", savedCourse);
         onAdd({ title: finalTitle }); // fallback
       }
     } catch (error) {
-      console.error("Fetch error:", error);
+      console.error("❌ Fetch error:", error);
       onAdd({ title: trimmed }); // fallback safe add
     } finally {
-      setLoading(false);
       setInputText("");
+      setLoading(false);
     }
   };
 

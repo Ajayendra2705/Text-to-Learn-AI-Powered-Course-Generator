@@ -26,9 +26,11 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
         if (!res.ok) throw new Error(`Failed to fetch outline (${res.status})`);
         const data = await res.json();
         setModules(data.modules || []);
-      } catch (err) {
+      } 
+      catch (err) {
         setError(err.message);
-      } finally {
+      } 
+      finally {
         setLoading(false);
       }
     };

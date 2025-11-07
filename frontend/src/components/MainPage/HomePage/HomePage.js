@@ -17,7 +17,6 @@ function HomePage() {
   const [loadingCourses, setLoadingCourses] = useState(false);
   const navigate = useNavigate();
 
-  // ✅ Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -25,7 +24,6 @@ function HomePage() {
     return () => unsubscribe();
   }, []);
 
-  // ✅ Fetch courses once user is ready
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -34,11 +32,12 @@ function HomePage() {
       try {
         const res = await fetch(`${BACKEND_URL}/api/courses/${user.uid}`);
         const data = await res.json();
-        // ✅ Backend already returns newest first
         setCourses(data);
-      } catch (err) {
+      } 
+      catch (err) {
         console.error("❌ Error fetching courses:", err);
-      } finally {
+      } 
+      finally {
         setLoadingCourses(false);
       }
     };
@@ -46,7 +45,6 @@ function HomePage() {
     fetchCourses();
   }, [user?.uid]);
 
-  // ✅ Add a course (and prepend locally)
   const handleAddCourse = async (payload) => {
     const titleRaw =
       typeof payload === "string"
@@ -73,16 +71,15 @@ function HomePage() {
 
       const newCourse = await res.json();
 
-      // ✅ Replace state completely (don’t merge old + backend)
       setCourses((prev) => [newCourse, ...prev]);
 
       setInputText("");
-    } catch (error) {
+    } 
+    catch (error) {
       console.error("❌ Error saving course to DB:", error);
     }
   };
 
-  // ✅ Delete course
   const handleDeleteCourse = async (courseId) => {
     try {
       await fetch(`${BACKEND_URL}/api/courses/${courseId}`, {
@@ -94,7 +91,6 @@ function HomePage() {
     }
   };
 
-  // ✅ Navigate
   const handleCourseClick = (course) => {
     navigate("/course", {
       state: { label: course.title, courseId: course._id },

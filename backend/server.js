@@ -8,8 +8,7 @@ const usersRoute = require("./routes/users");
 const generateRoute = require("./routes/generate_name");
 const coursesRoute = require("./routes/courses");
 const generateOutlineRoute = require("./routes/generate_outline");
-const topicDetailsRoute = require("./routes/topic_details"); // <-- Add this line
-
+const topicDetailsRoute = require("./routes/topic_details");
 const app = express();
 
 // CORS setup
