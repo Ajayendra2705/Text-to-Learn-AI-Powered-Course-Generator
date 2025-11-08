@@ -15,7 +15,8 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
     setError(null);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/generate_outline`, {
+      // ✅ use correct endpoint — hyphen not underscore
+      const res = await fetch(`${BACKEND_URL}/api/generate-outline`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ courseTitle }),
@@ -23,7 +24,13 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
 
       if (!res.ok) throw new Error(`Failed to fetch outline (${res.status})`);
       const data = await res.json();
-      setModules(data.modules || []);
+
+      // 🧩 If backend only queued the job (no modules yet)
+      if (!data.modules || !Array.isArray(data.modules)) {
+        setModules([]);
+      } else {
+        setModules(data.modules);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -33,12 +40,13 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
 
   useEffect(() => {
     fetchOutline();
-  }, [fetchOutline]); // ✅ ESLint safe
+  }, [fetchOutline]); // ✅ ESLint-safe dependency
 
-  // ⚡ Promote outline generation to priority queue
-  const promoteOutlinePriority = async () => {
+  // ⚡ Promote outline generation to priority queue (when expanded)
+  const promoteOutlinePriority = useCallback(async () => {
+    if (!courseTitle) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/generate_outline/priority`, {
+      const res = await fetch(`${BACKEND_URL}/api/generate-outline/priority`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ courseTitle }),
@@ -49,7 +57,7 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
     } catch (err) {
       console.error("❌ [Priority] Outline promotion failed:", err.message);
     }
-  };
+  }, [courseTitle, BACKEND_URL]);
 
   const toggleModule = (index) => {
     setExpandedModules((prev) => ({
@@ -57,17 +65,17 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
       [index]: !prev[index],
     }));
 
-    // 👇 Promote outline job silently on user expand
+    // 👇 Promote outline job silently when user expands
     promoteOutlinePriority();
   };
 
-  // ⚡ Trigger topic generation on click
+  // ⚡ Trigger topic generation when submodule clicked
   const handleSubmoduleClick = async (e, moduleTitle, submoduleName) => {
     e.stopPropagation();
     onSelectSubmodule({ moduleTitle, submoduleName });
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/topic_details/priority`, {
+      await fetch(`${BACKEND_URL}/api/topic_details/priority`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -76,8 +84,6 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
           courseTitle,
         }),
       });
-
-      if (!res.ok) throw new Error("Failed to trigger priority topic generation");
       console.log(`⚡ [Priority] Triggered topic generation for "${submoduleName}"`);
     } catch (err) {
       console.error("❌ [Priority] Error triggering topic:", err.message);
@@ -91,7 +97,7 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
       {loading && <p className="info-text">Loading modules...</p>}
       {error && <p className="error-text">Error: {error}</p>}
       {!loading && !error && modules.length === 0 && (
-        <p className="info-text">No modules found.</p>
+        <p className="info-text">No modules found yet — please wait...</p>
       )}
 
       <ul className="modules-list">

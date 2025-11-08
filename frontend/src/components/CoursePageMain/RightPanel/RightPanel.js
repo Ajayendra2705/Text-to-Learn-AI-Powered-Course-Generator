@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import "./RightPanel.css";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -10,67 +10,71 @@ export default function RightPanel({ selectedItem, courseTitle }) {
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   const contentRef = useRef(null);
 
-  useEffect(() => {
+  // 🧠 Fetch topic details (priority)
+  const fetchDetails = useCallback(async () => {
     if (!selectedItem) {
       setDetails(null);
       return;
     }
 
     const { moduleTitle, submoduleName } = selectedItem;
-    let retryTimeout;
+    setLoading(true);
+    setError(null);
+    setDetails(null);
 
-    const fetchDetails = async () => {
-      setLoading(true);
-      setError(null);
-      setDetails(null);
+    try {
+      // ⚡ Trigger PRIORITY topic generation when viewed
+      const res = await fetch(`${BACKEND_URL}/api/topic_details/priority`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: submoduleName,
+          moduleName: moduleTitle,
+          courseTitle,
+        }),
+      });
 
-      try {
-        // ⚡ Trigger PRIORITY topic generation when viewed
-        const res = await fetch(`${BACKEND_URL}/api/topic_details/priority`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            topic: submoduleName,
-            moduleName: moduleTitle,
-            courseTitle,
-          }),
+      if (!res.ok) throw new Error("Failed to fetch topic details");
+      const data = await res.json();
+
+      // ⏳ Still generating — show waiting message and retry
+      if (data.status === "prioritized" || data.status === "queued") {
+        setDetails({
+          text: [
+            `⚙️ The topic "${submoduleName}" is being generated. Please wait a few moments...`,
+          ],
+          videos: [],
+          mcqs: [],
+          extraQuestions: [],
         });
 
-        if (!res.ok) throw new Error("Failed to fetch topic details");
-        const data = await res.json();
-
-        // ⏳ Still generating — show waiting message and retry
-        if (data.status === "prioritized" || data.status === "queued") {
-          setDetails({
-            text: [
-              `⚙️ The topic "${submoduleName}" is being generated. Please wait a few moments...`,
-            ],
-            videos: [],
-            mcqs: [],
-            extraQuestions: [],
-          });
-
-          // Retry after 10 seconds
-          retryTimeout = setTimeout(fetchDetails, 10000);
-          return;
-        }
-
-        // ✅ Successfully fetched details
-        setDetails(data);
-      } catch (err) {
-        setError(err.message || "Error fetching topic details");
-      } finally {
-        setLoading(false);
+        // Auto-refresh after 10s
+        setTimeout(fetchDetails, 10000);
+        return;
       }
-    };
 
-    fetchDetails();
+      // ✅ Successfully fetched details
+      setDetails(data);
+    } catch (err) {
+      setError(err.message || "Error fetching topic details");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedItem, courseTitle, BACKEND_URL]);
 
-    // 🧹 Cleanup timeout when topic changes
+  // 🔁 Run every time user selects a different submodule
+  useEffect(() => {
+    let retryTimeout;
+    if (selectedItem) {
+      fetchDetails();
+    } else {
+      setDetails(null);
+    }
+
     return () => {
       if (retryTimeout) clearTimeout(retryTimeout);
     };
-  }, [selectedItem, courseTitle, BACKEND_URL]);
+  }, [fetchDetails, selectedItem]);
 
   // 🧾 Download PDF
   const downloadPDF = () => {
