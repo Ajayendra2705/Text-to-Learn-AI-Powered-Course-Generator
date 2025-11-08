@@ -17,6 +17,7 @@ export default function RightPanel({ selectedItem, courseTitle }) {
     }
 
     const { moduleTitle, submoduleName } = selectedItem;
+    let retryTimeout;
 
     const fetchDetails = async () => {
       setLoading(true);
@@ -38,20 +39,23 @@ export default function RightPanel({ selectedItem, courseTitle }) {
         if (!res.ok) throw new Error("Failed to fetch topic details");
         const data = await res.json();
 
-        // If topic still generating — show spinner message
+        // ⏳ Still generating — show waiting message and retry
         if (data.status === "prioritized" || data.status === "queued") {
           setDetails({
-            text: [`⚙️ The topic "${submoduleName}" is being generated. Please wait a few moments...`],
+            text: [
+              `⚙️ The topic "${submoduleName}" is being generated. Please wait a few moments...`,
+            ],
             videos: [],
             mcqs: [],
             extraQuestions: [],
           });
 
-          // Try again after 10 seconds automatically
-          setTimeout(fetchDetails, 10000);
+          // Retry after 10 seconds
+          retryTimeout = setTimeout(fetchDetails, 10000);
           return;
         }
 
+        // ✅ Successfully fetched details
         setDetails(data);
       } catch (err) {
         setError(err.message || "Error fetching topic details");
@@ -61,7 +65,12 @@ export default function RightPanel({ selectedItem, courseTitle }) {
     };
 
     fetchDetails();
-  }, [selectedItem, courseTitle]);
+
+    // 🧹 Cleanup timeout when topic changes
+    return () => {
+      if (retryTimeout) clearTimeout(retryTimeout);
+    };
+  }, [selectedItem, courseTitle, BACKEND_URL]);
 
   // 🧾 Download PDF
   const downloadPDF = () => {
@@ -125,7 +134,9 @@ export default function RightPanel({ selectedItem, courseTitle }) {
           </button>
 
           <div className="topic-details" ref={contentRef}>
-            {details.text?.map((para, i) => <p key={i}>{para}</p>)}
+            {details.text?.map((para, i) => (
+              <p key={i}>{para}</p>
+            ))}
 
             {details.videos?.length > 0 && (
               <>
@@ -148,13 +159,17 @@ export default function RightPanel({ selectedItem, courseTitle }) {
                 <ul>
                   {details.mcqs.map((mcq, i) => (
                     <li key={i}>
-                      <p><b>Q:</b> {mcq.question}</p>
+                      <p>
+                        <b>Q:</b> {mcq.question}
+                      </p>
                       <ul>
                         {mcq.options.map((opt, idx) => (
                           <li key={idx}>{opt}</li>
                         ))}
                       </ul>
-                      <p><i>Answer:</i> {mcq.answer}</p>
+                      <p>
+                        <i>Answer:</i> {mcq.answer}
+                      </p>
                     </li>
                   ))}
                 </ul>

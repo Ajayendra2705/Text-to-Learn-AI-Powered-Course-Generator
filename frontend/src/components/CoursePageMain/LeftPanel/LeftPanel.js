@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import "./LeftPanel.css";
 
 export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
@@ -9,7 +9,8 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   // 🧠 Fetch course outline (background queue by default)
-  const fetchOutline = async () => {
+  const fetchOutline = useCallback(async () => {
+    if (!courseTitle) return;
     setLoading(true);
     setError(null);
 
@@ -28,14 +29,13 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseTitle, BACKEND_URL]);
 
   useEffect(() => {
-    if (!courseTitle) return;
-    fetchOutline(); // background job by default
-  }, [courseTitle]);
+    fetchOutline();
+  }, [fetchOutline]); // ✅ ESLint safe
 
-  // ⚡ Promote outline generation to priority queue (no re-fetch)
+  // ⚡ Promote outline generation to priority queue
   const promoteOutlinePriority = async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/generate_outline/priority`, {
@@ -57,11 +57,11 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
       [index]: !prev[index],
     }));
 
-    // 👇 User interaction → quietly promote this outline job
+    // 👇 Promote outline job silently on user expand
     promoteOutlinePriority();
   };
 
-  // ⚡ Trigger topic generation on user click
+  // ⚡ Trigger topic generation on click
   const handleSubmoduleClick = async (e, moduleTitle, submoduleName) => {
     e.stopPropagation();
     onSelectSubmodule({ moduleTitle, submoduleName });
@@ -76,6 +76,7 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
           courseTitle,
         }),
       });
+
       if (!res.ok) throw new Error("Failed to trigger priority topic generation");
       console.log(`⚡ [Priority] Triggered topic generation for "${submoduleName}"`);
     } catch (err) {
