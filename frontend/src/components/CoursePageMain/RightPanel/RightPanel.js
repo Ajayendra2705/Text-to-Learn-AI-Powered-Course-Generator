@@ -23,7 +23,6 @@ export default function RightPanel({ selectedItem, courseTitle }) {
     setDetails(null);
 
     try {
-      // ⚡ Trigger PRIORITY topic generation when viewed
       const res = await fetch(`${BACKEND_URL}/api/topic_details/priority`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,7 +61,6 @@ export default function RightPanel({ selectedItem, courseTitle }) {
     }
   }, [selectedItem, courseTitle, BACKEND_URL]);
 
-  // 🔁 Run every time user selects a different submodule
   useEffect(() => {
     let retryTimeout;
     if (selectedItem) {

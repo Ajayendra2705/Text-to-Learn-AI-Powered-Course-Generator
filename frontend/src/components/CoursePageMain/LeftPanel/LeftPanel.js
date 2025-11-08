@@ -15,7 +15,7 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
     setError(null);
 
     try {
-      // ✅ use correct endpoint — hyphen not underscore
+      // ✅ correct endpoint (hyphen not underscore)
       const res = await fetch(`${BACKEND_URL}/api/generate-outline`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -25,7 +25,6 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
       if (!res.ok) throw new Error(`Failed to fetch outline (${res.status})`);
       const data = await res.json();
 
-      // 🧩 If backend only queued the job (no modules yet)
       if (!data.modules || !Array.isArray(data.modules)) {
         setModules([]);
       } else {
@@ -40,7 +39,7 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
 
   useEffect(() => {
     fetchOutline();
-  }, [fetchOutline]); // ✅ ESLint-safe dependency
+  }, [fetchOutline]); // ✅ ESLint clean
 
   // ⚡ Promote outline generation to priority queue (when expanded)
   const promoteOutlinePriority = useCallback(async () => {
@@ -64,12 +63,9 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
       ...prev,
       [index]: !prev[index],
     }));
-
-    // 👇 Promote outline job silently when user expands
     promoteOutlinePriority();
   };
 
-  // ⚡ Trigger topic generation when submodule clicked
   const handleSubmoduleClick = async (e, moduleTitle, submoduleName) => {
     e.stopPropagation();
     onSelectSubmodule({ moduleTitle, submoduleName });
