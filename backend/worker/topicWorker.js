@@ -5,6 +5,9 @@ const mongoose = require("mongoose");
 const { generateTopicDetails } = require("../services/TopicGenerator");
 const TopicDetail = require("../models/TopicDetail");
 
+// ----------------------
+// 🔗 Redis Connection
+// ----------------------
 const connection = new IORedis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
   tls: process.env.REDIS_URL.startsWith("rediss://")
@@ -12,46 +15,102 @@ const connection = new IORedis(process.env.REDIS_URL, {
     : undefined,
 });
 
-mongoose.connect(process.env.MONGODB_URI).then(() => {
-  console.log("✅ MongoDB connected (Topic Worker)");
-});
+// ----------------------
+// 🧠 MongoDB Connection
+// ----------------------
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => console.log("✅ MongoDB connected (Topic Worker)"))
+  .catch((err) => {
+    console.error("❌ MongoDB connection failed:", err.message);
+    process.exit(1);
+  });
 
-const worker = new Worker(
-  "topic-generation",
-  async (job) => {
-    const { courseId, courseTitle, moduleTitle, topicTitle } = job.data;
-    console.log(`🧠 [Worker] Generating topic "${topicTitle}"`);
+// ----------------------
+// ⚙️ Shared topic handler
+// ----------------------
+async function processTopicJob(job, queueType = "NORMAL") {
+  const { courseId, courseTitle, moduleTitle, topicTitle } = job.data;
+  const priority = job.opts.priority || (queueType === "PRIORITY" ? 1 : 5);
 
+  console.log(`🧠 [${queueType}] Processing topic: "${topicTitle}"`);
+
+  try {
+    // 1️⃣ Skip if topic already exists in DB
     const existing = await TopicDetail.findOne({
       courseTitle,
       moduleName: moduleTitle,
       topic: topicTitle,
     });
-    if (existing) return console.log(`⚠️ [Skip] Duplicate topic: "${topicTitle}"`);
-
-    try {
-      const data = await generateTopicDetails(courseTitle, moduleTitle, topicTitle);
-      await TopicDetail.create({
-        courseTitle,
-        moduleName: moduleTitle,
-        topic: topicTitle,
-        text: data.text,
-        videos: data.videos,
-        mcqs: data.mcqs,
-        extraQuestions: data.extraQuestions,
-      });
-
-      console.log(`💾 [DB] Topic saved: "${topicTitle}"`);
-    } catch (err) {
-      console.error(`❌ [Worker] Failed to generate topic "${topicTitle}":`, err.message);
+    if (existing) {
+      console.log(`⚠️ [${queueType}] "${topicTitle}" already exists — removing job`);
+      await job.remove();
+      return;
     }
-  },
-  { connection, concurrency: 3 } // 3 at a time safely under Cohere limits
+
+    // 2️⃣ Generate topic details using AI
+    const data = await generateTopicDetails(courseTitle, moduleTitle, topicTitle);
+
+    // 3️⃣ Save topic in DB
+    await TopicDetail.create({
+      courseTitle,
+      moduleName: moduleTitle,
+      topic: topicTitle,
+      text: data.text,
+      videos: data.videos,
+      mcqs: data.mcqs,
+      extraQuestions: data.extraQuestions,
+    });
+
+    console.log(`💾 [${queueType}] Saved topic: "${topicTitle}"`);
+
+    // 4️⃣ Cleanup job after successful save
+    await job.remove();
+    console.log(`🧹 [${queueType}] Removed completed job for "${topicTitle}"`);
+  } catch (err) {
+    console.error(`❌ [${queueType}] Failed topic "${topicTitle}":`, err.message);
+
+    // Prevent retry loops — clean up even failed jobs
+    try {
+      await job.remove();
+      console.log(`🧹 [${queueType}] Removed failed job for "${topicTitle}"`);
+    } catch (cleanupErr) {
+      console.error(`⚠️ [Cleanup] Couldn’t remove "${topicTitle}":`, cleanupErr.message);
+    }
+  }
+}
+
+// ----------------------
+// 🧠 Topic Workers (Normal + Priority)
+// ----------------------
+
+// 🕓 Normal background topic generation
+new Worker(
+  "topic-generation",
+  async (job) => await processTopicJob(job, "NORMAL"),
+  {
+    connection,
+    concurrency: 3, // safe parallel limit
+  }
 );
 
-worker.on("completed", (job) =>
-  console.log(`🎉 [Worker] Topic done: ${job.data.topicTitle}`)
+// ⚡ High-priority topic generation
+new Worker(
+  "priority-topic-generation",
+  async (job) => await processTopicJob(job, "PRIORITY"),
+  {
+    connection,
+    concurrency: 3, // same concurrency
+  }
 );
-worker.on("failed", (job, err) =>
-  console.error(`💥 [Worker] Topic failed: ${job.data.topicTitle}`, err.message)
-);
+
+// ----------------------
+// 🧹 Cleanup on exit
+// ----------------------
+process.on("SIGINT", async () => {
+  console.log("\n🧹 Shutting down Topic Worker...");
+  await connection.quit();
+  await mongoose.disconnect();
+  console.log("👋 Topic Worker stopped cleanly");
+  process.exit(0);
+});

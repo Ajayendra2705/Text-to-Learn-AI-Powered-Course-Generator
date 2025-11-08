@@ -1,107 +1,117 @@
-// routes/generate_outline.js
 const express = require("express");
 const router = express.Router();
 const CourseOutline = require("../models/CourseOutline");
-const TopicDetail = require("../models/TopicDetail");
-const { generateCourseOutline } = require("../services/OutlineGenerator");
-const { generateTopicDetails } = require("../services/TopicGenerator");
+const { outlineQueue } = require("../queues/courseQueue");
 
+// 🧠 Normal outline generation (background, priority 5)
 router.post("/", async (req, res) => {
   try {
     const { courseTitle } = req.body;
+
     if (!courseTitle || typeof courseTitle !== "string" || !courseTitle.trim()) {
       return res.status(400).json({ error: "Invalid or empty courseTitle provided." });
     }
 
     const cleanTitle = courseTitle.trim();
-    console.log(`📘 [Outline] Generating for: "${cleanTitle}"`);
+    console.log(`📘 [Outline] Queueing background generation for: "${cleanTitle}"`);
 
-    let outline = await CourseOutline.findOne({ courseTitle: cleanTitle });
-    if (!outline) {
-      console.log("🧠 [AI] Generating new outline...");
-      const outlineData = await generateCourseOutline(cleanTitle);
-
-      outline = await CourseOutline.create({
+    // 🧠 Check for cached outline
+    let course = await CourseOutline.findOne({ courseTitle: cleanTitle });
+    if (course && course.status === "completed" && course.modules?.length) {
+      console.log("✅ [Cache] Found completed outline, returning cached data");
+      return res.json({
+        id: course._id,
         courseTitle: cleanTitle,
-        modules: outlineData.modules,
-        status: "completed",
+        modules: course.modules,
+        status: course.status,
+        message: "Using cached course outline.",
       });
-      console.log(`💾 [DB] Saved new outline for "${cleanTitle}"`);
-    } else {
-      console.log("✅ [Cache] Found existing outline in DB");
     }
 
-    // 🚀 Start topic generation (non-blocking)
-    (async () => {
-      const delay = (ms) => new Promise((res) => setTimeout(res, ms));
-      const allTopics = [];
+    // 🧩 Create placeholder if not exists
+    if (!course) {
+      course = await CourseOutline.create({
+        courseTitle: cleanTitle,
+        modules: [],
+        status: "queued",
+      });
+    }
 
-      for (const mod of outline.modules) {
-        for (const sub of mod.submodules) {
-          allTopics.push({ moduleTitle: mod.title, topic: sub });
-        }
-      }
+    // 🧩 Prevent duplicate background jobs
+    const jobKey = `outline_${cleanTitle.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const existingJob = await outlineQueue.getJob(jobKey);
+    if (!existingJob) {
+      await outlineQueue.add(
+        "generate-outline",
+        { courseId: course._id, courseTitle: cleanTitle },
+        { priority: 5, jobId: jobKey }
+      );
+      console.log(`🧩 [Queue] Outline job queued for "${cleanTitle}" (priority 5)`);
+    } else {
+      console.log(`⚠️ [Queue] Outline already queued: "${cleanTitle}"`);
+    }
 
-      console.log(`🧩 [BG] Starting generation for ${allTopics.length} topics...`);
-      const batchSize = 5;
-      const pauseMs = 15000;
-
-      for (let i = 0; i < allTopics.length; i += batchSize) {
-        const batch = allTopics.slice(i, i + batchSize);
-
-        await Promise.allSettled(
-          batch.map(async ({ moduleTitle, topic }) => {
-            try {
-              const existing = await TopicDetail.findOne({
-                courseTitle: cleanTitle,
-                moduleName: moduleTitle,
-                topic,
-              });
-              if (existing) return;
-
-              console.log(`🧠 [AI] Generating topic: "${topic}" (${moduleTitle})`);
-              const topicData = await generateTopicDetails(cleanTitle, moduleTitle, topic);
-
-              await TopicDetail.create({
-                courseTitle: cleanTitle,
-                moduleName: moduleTitle,
-                topic,
-                text: topicData.text,
-                videos: topicData.videos,
-                mcqs: topicData.mcqs,
-                extraQuestions: topicData.extraQuestions,
-              });
-
-              console.log(`💾 [DB] Saved topic details for "${topic}"`);
-            } 
-            catch (err) {
-              if (err.code === 11000) {
-                console.log(`⚠️ [DB] Duplicate topic skipped: "${topic}"`);
-              } 
-              else {
-                console.error(`❌ [AI] Failed topic "${topic}":`, err.message);
-              }
-            }
-          })
-        );
-
-        console.log(`⏳ Waiting ${pauseMs / 1000}s before next batch...`);
-        await delay(pauseMs);
-      }
-
-      console.log(`✅ [BG] Finished generating all topics for: "${cleanTitle}"`);
-    })();
-
-    return res.json({
-      id: outline._id,
+    res.json({
+      id: course._id,
       courseTitle: cleanTitle,
-      modules: outline.modules,
-      status: "completed",
-      message: "Outline ready. Topic details generation started in background.",
+      status: "queued",
+      message: "Outline generation queued in background.",
     });
   } catch (err) {
-    console.error("❌ [Outline] Generation failed:", err.message);
-    return res.status(500).json({ error: "Failed to generate course outline." });
+    console.error("❌ [Outline] Error queuing outline:", err.message);
+    res.status(500).json({ error: "Failed to queue course outline." });
+  }
+});
+
+// ⚡ PRIORITY route — user-triggered generation (priority 1)
+router.post("/priority", async (req, res) => {
+  try {
+    const { courseTitle } = req.body;
+
+    if (!courseTitle || typeof courseTitle !== "string" || !courseTitle.trim()) {
+      return res.status(400).json({ error: "Invalid or empty courseTitle provided." });
+    }
+
+    const cleanTitle = courseTitle.trim();
+    console.log(`⚡ [Priority] Immediate outline generation requested for: "${cleanTitle}"`);
+
+    // 🧠 Find or create outline record
+    let course = await CourseOutline.findOne({ courseTitle: cleanTitle });
+    if (!course) {
+      course = await CourseOutline.create({
+        courseTitle: cleanTitle,
+        modules: [],
+        status: "prioritized",
+      });
+    } else {
+      course.status = "prioritized";
+      await course.save();
+    }
+
+    // 🧩 Prevent duplicate priority jobs
+    const jobKey = `outline_${cleanTitle.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const existingJob = await outlineQueue.getJob(jobKey);
+
+    if (!existingJob) {
+      await outlineQueue.add(
+        "generate-outline",
+        { courseId: course._id, courseTitle: cleanTitle },
+        { priority: 1, jobId: jobKey }
+      );
+      console.log(`🚀 [Queue] High-priority outline queued for "${cleanTitle}"`);
+    } else {
+      console.log(`⚠️ [Queue] Priority outline already queued: "${cleanTitle}"`);
+    }
+
+    res.json({
+      id: course._id,
+      courseTitle: cleanTitle,
+      status: "prioritized",
+      message: "High-priority outline generation queued.",
+    });
+  } catch (err) {
+    console.error("❌ [Priority Outline] Error:", err.message);
+    res.status(500).json({ error: "Failed to queue high-priority outline." });
   }
 });
 

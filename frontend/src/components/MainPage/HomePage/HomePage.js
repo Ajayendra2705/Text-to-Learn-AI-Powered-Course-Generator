@@ -17,6 +17,7 @@ function HomePage() {
   const [loadingCourses, setLoadingCourses] = useState(false);
   const navigate = useNavigate();
 
+  // ✅ Track Firebase authentication state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -24,6 +25,7 @@ function HomePage() {
     return () => unsubscribe();
   }, []);
 
+  // ✅ Fetch user's saved courses
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -31,13 +33,21 @@ function HomePage() {
       setLoadingCourses(true);
       try {
         const res = await fetch(`${BACKEND_URL}/api/courses/${user.uid}`);
+        if (!res.ok) throw new Error(`Failed to fetch courses (${res.status})`);
+
         const data = await res.json();
-        setCourses(data);
-      } 
-      catch (err) {
-        console.error("❌ Error fetching courses:", err);
-      } 
-      finally {
+
+        // ✅ Always ensure we store an array
+        if (Array.isArray(data)) {
+          setCourses(data);
+        } else {
+          console.warn("⚠️ Backend returned non-array response for courses:", data);
+          setCourses([]);
+        }
+      } catch (err) {
+        console.error("❌ Error fetching courses:", err.message);
+        setCourses([]); // fallback to empty list
+      } finally {
         setLoadingCourses(false);
       }
     };
@@ -45,6 +55,7 @@ function HomePage() {
     fetchCourses();
   }, [user?.uid]);
 
+  // ✅ Add a new course
   const handleAddCourse = async (payload) => {
     const titleRaw =
       typeof payload === "string"
@@ -65,29 +76,46 @@ function HomePage() {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
+        const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "Failed to add course");
       }
 
       const newCourse = await res.json();
-
-      setCourses((prev) => [newCourse, ...prev]);
+      if (newCourse && newCourse._id) {
+        setCourses((prev) => [newCourse, ...prev]);
+      }
 
       setInputText("");
-    } 
-    catch (error) {
-      console.error("❌ Error saving course to DB:", error);
+    } catch (error) {
+      console.error("❌ Error saving course to DB:", error.message);
     }
   };
 
+  // ✅ Delete course and cancel any queued background tasks
   const handleDeleteCourse = async (courseId) => {
     try {
-      await fetch(`${BACKEND_URL}/api/courses/${courseId}`, {
+      const res = await fetch(`${BACKEND_URL}/api/courses/${courseId}`, {
         method: "DELETE",
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete course");
+      }
+
+      // remove locally
       setCourses((prev) => prev.filter((c) => c._id !== courseId));
+
+      // 🧹 Tell backend to clean up queue
+      await fetch(`${BACKEND_URL}/api/queue/cleanup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId }),
+      });
+
+      console.log(`🧹 [Cleanup] Queue cleanup triggered for course ${courseId}`);
     } catch (error) {
-      console.error("❌ Error deleting course:", error);
+      console.error("❌ Error deleting course:", error.message);
     }
   };
 
@@ -119,7 +147,7 @@ function HomePage() {
           <p className="loading-text">Loading courses...</p>
         ) : (
           <CourseList
-            courses={courses}
+            courses={Array.isArray(courses) ? courses : []}
             onDelete={handleDeleteCourse}
             onClick={handleCourseClick}
           />

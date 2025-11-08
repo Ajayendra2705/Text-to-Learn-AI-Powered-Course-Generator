@@ -24,20 +24,35 @@ export default function RightPanel({ selectedItem, courseTitle }) {
       setDetails(null);
 
       try {
-        const aiRes = await fetch(`${BACKEND_URL}/api/topic_details`, {
+        // ⚡ Trigger PRIORITY topic generation when viewed
+        const res = await fetch(`${BACKEND_URL}/api/topic_details/priority`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             topic: submoduleName,
             moduleName: moduleTitle,
-            courseTitle: courseTitle,
+            courseTitle,
           }),
         });
 
-        if (!aiRes.ok) throw new Error("Failed to fetch topic details");
+        if (!res.ok) throw new Error("Failed to fetch topic details");
+        const data = await res.json();
 
-        const aiData = await aiRes.json();
-        setDetails(aiData);
+        // If topic still generating — show spinner message
+        if (data.status === "prioritized" || data.status === "queued") {
+          setDetails({
+            text: [`⚙️ The topic "${submoduleName}" is being generated. Please wait a few moments...`],
+            videos: [],
+            mcqs: [],
+            extraQuestions: [],
+          });
+
+          // Try again after 10 seconds automatically
+          setTimeout(fetchDetails, 10000);
+          return;
+        }
+
+        setDetails(data);
       } catch (err) {
         setError(err.message || "Error fetching topic details");
       } finally {
@@ -48,6 +63,7 @@ export default function RightPanel({ selectedItem, courseTitle }) {
     fetchDetails();
   }, [selectedItem, courseTitle]);
 
+  // 🧾 Download PDF
   const downloadPDF = () => {
     const input = contentRef.current;
     if (!input) return;
@@ -79,7 +95,7 @@ export default function RightPanel({ selectedItem, courseTitle }) {
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`${submoduleName}.pdf`);
+      pdf.save(`${selectedItem.submoduleName}.pdf`);
     });
   };
 
@@ -93,13 +109,11 @@ export default function RightPanel({ selectedItem, courseTitle }) {
     );
   }
 
-  const { moduleTitle, submoduleName } = selectedItem;
+  const { submoduleName } = selectedItem;
 
   return (
     <div id="right-panel">
-      <h2>
-        {submoduleName}
-      </h2>
+      <h2>{submoduleName}</h2>
 
       {loading && <p className="loading-text">Loading details...</p>}
       {error && <p className="error-text">{error}</p>}

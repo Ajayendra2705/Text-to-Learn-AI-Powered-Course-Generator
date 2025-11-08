@@ -6,48 +6,81 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [expandedModules, setExpandedModules] = useState({});
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+  // 🧠 Fetch course outline (background queue by default)
+  const fetchOutline = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/generate_outline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseTitle }),
+      });
+
+      if (!res.ok) throw new Error(`Failed to fetch outline (${res.status})`);
+      const data = await res.json();
+      setModules(data.modules || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!courseTitle) return;
-
-    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-
-    const fetchOutline = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/generate_outline`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ courseTitle }),
-        });
-
-        if (!res.ok) throw new Error(`Failed to fetch outline (${res.status})`);
-        const data = await res.json();
-        setModules(data.modules || []);
-      } 
-      catch (err) {
-        setError(err.message);
-      } 
-      finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOutline();
+    fetchOutline(); // background job by default
   }, [courseTitle]);
+
+  // ⚡ Promote outline generation to priority queue (no re-fetch)
+  const promoteOutlinePriority = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/generate_outline/priority`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseTitle }),
+      });
+
+      if (!res.ok) throw new Error("Failed to promote outline priority");
+      console.log(`⚡ [Priority] Outline promoted for "${courseTitle}"`);
+    } catch (err) {
+      console.error("❌ [Priority] Outline promotion failed:", err.message);
+    }
+  };
 
   const toggleModule = (index) => {
     setExpandedModules((prev) => ({
       ...prev,
       [index]: !prev[index],
     }));
+
+    // 👇 User interaction → quietly promote this outline job
+    promoteOutlinePriority();
   };
 
-  const handleSubmoduleClick = (e, moduleTitle, submoduleName) => {
+  // ⚡ Trigger topic generation on user click
+  const handleSubmoduleClick = async (e, moduleTitle, submoduleName) => {
     e.stopPropagation();
     onSelectSubmodule({ moduleTitle, submoduleName });
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/topic_details/priority`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: submoduleName,
+          moduleName: moduleTitle,
+          courseTitle,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to trigger priority topic generation");
+      console.log(`⚡ [Priority] Triggered topic generation for "${submoduleName}"`);
+    } catch (err) {
+      console.error("❌ [Priority] Error triggering topic:", err.message);
+    }
   };
 
   return (

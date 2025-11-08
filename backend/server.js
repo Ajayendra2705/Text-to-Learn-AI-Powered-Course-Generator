@@ -9,14 +9,17 @@ const generateRoute = require("./routes/generate_name");
 const coursesRoute = require("./routes/courses");
 const generateOutlineRoute = require("./routes/generate_outline");
 const topicDetailsRoute = require("./routes/topic_details");
+
 const app = express();
 
-// CORS setup
+// -----------------------------
+// 🔐 CORS setup
+// -----------------------------
 app.use(
   cors({
     origin: [
       "http://localhost:3000", // local dev frontend
-      "https://text-to-learn-ai-powered-course-gen.vercel.app", // deployed frontend URL
+      "https://text-to-learn-ai-powered-course-gen.vercel.app", // deployed frontend
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -24,16 +27,18 @@ app.use(
   })
 );
 
-// Handle preflight requests globally for all routes
+// Handle preflight requests
 app.options("*", cors());
 
-// Middleware for JSON parsing
+// -----------------------------
+// 🧩 Middleware
+// -----------------------------
 app.use(express.json());
-
-// Mongoose strict query fix (recommended for newer versions)
 mongoose.set("strictQuery", false);
 
-// MongoDB connection with async/await pattern & better error handling
+// -----------------------------
+// 🧠 MongoDB connection
+// -----------------------------
 (async () => {
   try {
     const mongoUri = process.env.MONGODB_URI;
@@ -44,34 +49,39 @@ mongoose.set("strictQuery", false);
     await mongoose.connect(mongoUri);
     console.log("✅ MongoDB connected");
   } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
+    console.error("❌ MongoDB connection error:", err.message);
     process.exit(1);
   }
 })();
 
-// Basic root route
-app.get("/", (req, res) => {
-  res.send("API is running.");
-});
+// -----------------------------
+// 🧠 API routes
+// -----------------------------
+app.get("/", (req, res) => res.send("API is running."));
 
-// API routes
 app.use("/api/users", usersRoute);
 app.use("/api/generate_name", generateRoute);
 app.use("/api/courses", coursesRoute);
 app.use("/api/generate_outline", generateOutlineRoute);
-app.use("/api/topic_details", topicDetailsRoute);  // <-- Mount new route here
+app.use("/api/topic_details", topicDetailsRoute);
 
-// 404 handler for unknown routes (optional but recommended)
+// -----------------------------
+// ⚠️ 404 handler
+// -----------------------------
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-// Global error handler middleware
+// -----------------------------
+// 💥 Global error handler
+// -----------------------------
 app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err);
+  console.error("❌ Unhandled error:", err.message);
   res.status(500).json({ error: "Internal server error" });
 });
 
-// Start server
+// -----------------------------
+// 🚀 Start server
+// -----------------------------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
