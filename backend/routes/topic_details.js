@@ -1,80 +1,127 @@
-// routes/topic_details.js
+// backend/routes/topic_details.js
 const express = require("express");
 const router = express.Router();
 const TopicDetail = require("../models/TopicDetail");
-const { generateTopicDetails } = require("../services/TopicGenerator");
+const { priorityTopicQueue } = require("../queues/priorityCourseQueue");
 
-// ✅ POST /api/topic_details
-router.post("/", async (req, res) => {
+/**
+ * ⚡ POST /api/topic_details/priority
+ * Queues a topic for high-priority generation (triggered when user clicks a topic)
+ */
+router.post("/priority", async (req, res) => {
   try {
     const { topic, moduleName, courseTitle } = req.body;
 
     // -----------------------------
     // 🧩 Input validation
     // -----------------------------
-    if (!topic || typeof topic !== "string" || !topic.trim()) {
-      return res.status(400).json({ error: "Invalid or empty topic provided." });
+    if (!topic || !courseTitle || !moduleName) {
+      return res.status(400).json({
+        error: "Missing required fields: topic, moduleName, or courseTitle.",
+      });
     }
 
     const cleanTopic = topic.trim();
-    const cleanModule = moduleName?.trim() || "General Module";
-    const cleanCourse = courseTitle?.trim() || "General Course";
+    const cleanModule = moduleName.trim();
+    const cleanCourse = courseTitle.trim();
 
     // -----------------------------
-    // 🧠 Check cache in MongoDB
+    // 🧠 Check if topic already exists
     // -----------------------------
-    const cached = await TopicDetail.findOne({
+    const existing = await TopicDetail.findOne({
       topic: cleanTopic,
       moduleName: cleanModule,
       courseTitle: cleanCourse,
-    });
+    }).lean();
 
-    if (cached) {
-      console.log(`✅ [Cache] Found topic details for "${cleanTopic}"`);
+    if (existing) {
+      console.log(`✅ [Cache] Found existing topic: "${cleanTopic}"`);
       return res.json({
-        text: cached.text,
-        videos: cached.videos,
-        mcqs: cached.mcqs,
-        extraQuestions: cached.extraQuestions,
+        status: existing.status || "completed",
         cached: true,
+        topicDetail: existing,
+        message: "Topic already exists in database.",
       });
     }
 
     // -----------------------------
-    // 🧠 Generate new content via AI
+    // ⚙️ Check if already queued
     // -----------------------------
-    console.log(`🧠 [AI] Generating topic details for "${cleanTopic}"...`);
-    const details = await generateTopicDetails(cleanCourse, cleanModule, cleanTopic);
+    const jobId = `priority_${cleanCourse}_${cleanModule}_${cleanTopic}`;
+    const existingJob = await priorityTopicQueue.getJob(jobId);
+
+    if (existingJob) {
+      console.log(`⚠️ [Queue] Topic already queued: "${cleanTopic}"`);
+      return res.json({
+        status: "queued",
+        cached: false,
+        message: "Topic already in queue for generation.",
+      });
+    }
 
     // -----------------------------
-    // 💾 Save new details to MongoDB
+    // 🚀 Queue new priority job
     // -----------------------------
-    const newDetail = new TopicDetail({
-      topic: cleanTopic,
-      moduleName: cleanModule,
-      courseTitle: cleanCourse,
-      text: details.text,
-      videos: details.videos,
-      mcqs: details.mcqs,
-      extraQuestions: details.extraQuestions,
-    });
+    await priorityTopicQueue.add(
+      "generate-priority-topic",
+      {
+        courseTitle: cleanCourse,
+        moduleTitle: cleanModule,
+        topicTitle: cleanTopic,
+      },
+      {
+        jobId,
+        removeOnComplete: true,
+        removeOnFail: false,
+        priority: 1,
+      }
+    );
 
-    await newDetail.save();
-    console.log(`💾 [DB] Saved new topic details for "${cleanTopic}"`);
+    console.log(`🚀 [Queue] Queued topic for generation: "${cleanTopic}"`);
 
-    // -----------------------------
-    // ✅ Respond to client
-    // -----------------------------
     return res.json({
-      text: details.text,
-      videos: details.videos,
-      mcqs: details.mcqs,
-      extraQuestions: details.extraQuestions,
+      status: "queued",
       cached: false,
+      message: "Priority topic generation queued successfully.",
     });
   } catch (err) {
-    console.error("❌ [API] Topic details generation failed:", err.message);
-    return res.status(500).json({ error: "Failed to generate topic details." });
+    console.error("❌ [Priority Topic API] Error:", err.message);
+    return res.status(500).json({ error: "Failed to queue topic generation." });
+  }
+});
+
+/**
+ * 🔍 GET /api/topic_details/check/:courseTitle/:moduleName/:topic
+ * Used by frontend to poll and check if topic details exist in DB
+ */
+router.get("/check/:courseTitle/:moduleName/:topic", async (req, res) => {
+  try {
+    const { courseTitle, moduleName, topic } = req.params;
+
+    const cleanCourse = decodeURIComponent(courseTitle).trim();
+    const cleanModule = decodeURIComponent(moduleName).trim();
+    const cleanTopic = decodeURIComponent(topic).trim();
+
+    const data = await TopicDetail.findOne({
+      courseTitle: cleanCourse,
+      moduleName: cleanModule,
+      topic: cleanTopic,
+    }).lean();
+
+    if (!data) {
+      return res.status(404).json({
+        status: "pending",
+        message: "Topic not yet generated.",
+      });
+    }
+
+    return res.json({
+      ...data,
+      status: data.status || "completed",
+    });
+  } catch (err) {
+    console.error("❌ [Check Topic API] Error:", err.message);
+    return res.status(500).json({ error: "Failed to fetch topic details." });
   }
 });
 

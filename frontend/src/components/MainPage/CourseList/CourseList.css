@@ -1,19 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap');
+
+/* ===============================
+   🎓 Courses Grid Wrapper
+   =============================== */
 .courses-wrapper {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 3 equal columns */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 28px;
   width: 100%;
   max-width: 1280px;
-  padding: 0 12px 24px;
   margin: 0 auto;
-  scrollbar-width: none; /* Hide scrollbar on Firefox */
+  padding: 24px 16px 40px;
+  box-sizing: border-box;
+  scrollbar-width: none; /* Hide scrollbar (Firefox) */
+  animation: fadeInCourses 0.8s ease-out forwards;
+  opacity: 0;
 }
 
+/* Hide scrollbar for Chrome/Safari/Edge */
 .courses-wrapper::-webkit-scrollbar {
-  display: none; /* Hide scrollbar on WebKit browsers */
+  display: none;
 }
 
-/* Responsive tweaks */
+/* ===============================
+   ✨ Animation
+   =============================== */
+@keyframes fadeInCourses {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===============================
+   📱 Responsive Breakpoints
+   =============================== */
 @media (max-width: 1200px) {
   .courses-wrapper {
     max-width: 980px;
@@ -23,16 +48,29 @@
 
 @media (max-width: 900px) {
   .courses-wrapper {
-    grid-template-columns: repeat(2, 1fr); /* 2 columns on medium screens */
-    max-width: 680px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    max-width: 95%;
     gap: 18px;
   }
 }
 
 @media (max-width: 650px) {
   .courses-wrapper {
-    grid-template-columns: 1fr; /* 1 column on small screens */
-    max-width: 99vw;
-    gap: 12px;
+    grid-template-columns: 1fr;
+    max-width: 95vw;
+    gap: 14px;
+    padding: 16px 8px 30px;
   }
+}
+
+/* ===============================
+   🧩 Optional: Smooth Hover Effect for Children
+   =============================== */
+.courses-wrapper > * {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.courses-wrapper > *:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 18px rgba(74, 163, 255, 0.1);
 }

@@ -20,39 +20,35 @@ function CourseInput({ inputText, setInputText, onAdd, userId }) {
     setLoading(true);
 
     try {
-      // 🧠 Step 1 — Ask AI for a professional course name
-      const genRes = await fetch(`${BACKEND_URL}/api/generate_name`, {
+      // ✅ 1) Generate AI name (correct endpoint with hyphen)
+      const genRes = await fetch(`${BACKEND_URL}/api/generate-name`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userInput: trimmed }),
       });
 
-      const genData = await genRes.json();
-      const finalTitle = genData?.suggestion || trimmed;
-
-      // 🧠 Step 2 — Save to DB
-      const saveRes = await fetch(`${BACKEND_URL}/api/courses`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, title: finalTitle }),
-      });
-
-      const savedCourse = await saveRes.json();
-
-      if (saveRes.ok && savedCourse?._id) {
-        onAdd(savedCourse);
-      } else {
-        console.error("⚠️ Failed to save course:", savedCourse);
-        onAdd({ title: finalTitle }); // fallback
+      // even if backend fails, we'll fall back to user input
+      let finalTitle = trimmed;
+      if (genRes.ok) {
+        const genData = await genRes.json();
+        finalTitle = genData?.suggestion?.trim() || trimmed;
       }
-    } catch (error) {
-      console.error("❌ Fetch error:", error);
-      onAdd({ title: trimmed }); // fallback safe add
-    } finally {
+
+      // ✅ 2) Delegate saving to parent (HomePage)
+      //    This avoids double-POSTing to /api/courses
+      onAdd(finalTitle);
+    } 
+    catch (error) {
+      console.error("❌ Name generation error:", error);
+      onAdd(trimmed); // graceful fallback
+    } 
+    finally {
       setInputText("");
       setLoading(false);
     }
   };
+
+  const disabled = loading || !inputText.trim();
 
   return (
     <div className="search-bar">
@@ -64,7 +60,7 @@ function CourseInput({ inputText, setInputText, onAdd, userId }) {
         onKeyDown={handleKeyDown}
         disabled={loading}
       />
-      <button onClick={handleAdd} disabled={loading}>
+      <button onClick={handleAdd} disabled={disabled}>
         {loading ? "Generating..." : "Add"}
       </button>
     </div>

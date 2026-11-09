@@ -1,3 +1,4 @@
+// backend/queues/courseQueue.js
 require("dotenv").config({ path: "../.env" });
 const { Queue } = require("bullmq");
 const IORedis = require("ioredis");
@@ -9,7 +10,7 @@ const connection = new IORedis(process.env.REDIS_URL, {
     : undefined,
 });
 
-console.log("🔗 Connected to Redis for queues");
+console.log("🔗 Connected to Redis for normal queues");
 
 const outlineQueue = new Queue("outline-generation", {
   connection,
@@ -27,4 +28,4 @@ const topicQueue = new Queue("topic-generation", {
   },
 });
 
-module.exports = { outlineQueue, topicQueue };
+module.exports = { outlineQueue, topicQueue, connection };

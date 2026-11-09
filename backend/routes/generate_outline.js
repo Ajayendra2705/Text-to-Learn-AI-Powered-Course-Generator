@@ -1,105 +1,100 @@
-// routes/generate_outline.js
+// backend/routes/generate_outline.js
 const express = require("express");
 const router = express.Router();
 const CourseOutline = require("../models/CourseOutline");
-const TopicDetail = require("../models/TopicDetail");
-const { generateCourseOutline } = require("../services/OutlineGenerator");
-const { generateTopicDetails } = require("../services/TopicGenerator");
+const { priorityOutlineQueue } = require("../queues/priorityCourseQueue");
 
-router.post("/", async (req, res) => {
+/**
+ * ✅ GET /api/generate_outline/check/:courseTitle
+ * Used by frontend LeftPanel to check outline generation status.
+ */
+router.get("/check/:courseTitle", async (req, res) => {
+  try {
+    const cleanTitle = decodeURIComponent(req.params.courseTitle.trim());
+    const outline = await CourseOutline.findOne({ courseTitle: cleanTitle }).lean();
+
+    if (!outline) {
+      console.log(`🕓 [Check] No outline found for "${cleanTitle}"`);
+      return res.status(404).json({
+        status: "pending",
+        message: "Outline not yet generated or queued.",
+      });
+    }
+
+    // ✅ If generation completed
+    if (
+      outline.status === "completed" &&
+      Array.isArray(outline.modules) &&
+      outline.modules.length > 0
+    ) {
+      return res.json({
+        status: "completed",
+        courseTitle: outline.courseTitle,
+        modules: outline.modules,
+      });
+    }
+
+    // ⚙️ Still generating or queued
+    return res.json({
+      status: outline.status || "queued",
+      courseTitle: outline.courseTitle,
+      modules: outline.modules || [],
+    });
+  } catch (err) {
+    console.error("❌ [Check Outline] Error:", err.message);
+    res.status(500).json({ error: "Failed to fetch outline status." });
+  }
+});
+
+/**
+ * ⚡ POST /api/generate_outline/priority
+ * Used by frontend (LeftPanel) to start priority outline generation.
+ */
+router.post("/priority", async (req, res) => {
   try {
     const { courseTitle } = req.body;
+
     if (!courseTitle || typeof courseTitle !== "string" || !courseTitle.trim()) {
-      return res.status(400).json({ error: "Invalid or empty courseTitle provided." });
+      return res.status(400).json({ error: "Invalid or empty course title." });
     }
 
     const cleanTitle = courseTitle.trim();
-    console.log(`📘 [Outline] Generating for: "${cleanTitle}"`);
+    console.log(`🚀 [Priority] Queueing outline for: "${cleanTitle}"`);
 
+    // Step 1️⃣ — Create or update existing DB entry
     let outline = await CourseOutline.findOne({ courseTitle: cleanTitle });
-    if (!outline) {
-      console.log("🧠 [AI] Generating new outline...");
-      const outlineData = await generateCourseOutline(cleanTitle);
 
+    if (!outline) {
       outline = await CourseOutline.create({
         courseTitle: cleanTitle,
-        modules: outlineData.modules,
-        status: "completed",
+        status: "queued",
+        isPriority: true,
+        modules: [],
       });
-      console.log(`💾 [DB] Saved new outline for "${cleanTitle}"`);
+      console.log(`🗂️ Created new CourseOutline record for "${cleanTitle}"`);
     } else {
-      console.log("✅ [Cache] Found existing outline in DB");
+      outline.status = "queued";
+      outline.isPriority = true;
+      outline.modules = [];
+      await outline.save();
+      console.log(`♻️ Updated existing CourseOutline for "${cleanTitle}"`);
     }
 
-    // 🚀 Start topic generation (non-blocking)
-    (async () => {
-      const delay = (ms) => new Promise((res) => setTimeout(res, ms));
-      const allTopics = [];
-
-      for (const mod of outline.modules) {
-        for (const sub of mod.submodules) {
-          allTopics.push({ moduleTitle: mod.title, topic: sub });
-        }
-      }
-
-      console.log(`🧩 [BG] Starting generation for ${allTopics.length} topics...`);
-      const batchSize = 5;
-      const pauseMs = 15000;
-
-      for (let i = 0; i < allTopics.length; i += batchSize) {
-        const batch = allTopics.slice(i, i + batchSize);
-
-        await Promise.allSettled(
-          batch.map(async ({ moduleTitle, topic }) => {
-            try {
-              const existing = await TopicDetail.findOne({
-                courseTitle: cleanTitle,
-                moduleName: moduleTitle,
-                topic,
-              });
-              if (existing) return;
-
-              console.log(`🧠 [AI] Generating topic: "${topic}" (${moduleTitle})`);
-              const topicData = await generateTopicDetails(cleanTitle, moduleTitle, topic);
-
-              await TopicDetail.create({
-                courseTitle: cleanTitle,
-                moduleName: moduleTitle,
-                topic,
-                text: topicData.text,
-                videos: topicData.videos,
-                mcqs: topicData.mcqs,
-                extraQuestions: topicData.extraQuestions,
-              });
-
-              console.log(`💾 [DB] Saved topic details for "${topic}"`);
-            } catch (err) {
-              if (err.code === 11000) {
-                console.log(`⚠️ [DB] Duplicate topic skipped: "${topic}"`);
-              } else {
-                console.error(`❌ [AI] Failed topic "${topic}":`, err.message);
-              }
-            }
-          })
-        );
-
-        console.log(`⏳ Waiting ${pauseMs / 1000}s before next batch...`);
-        await delay(pauseMs);
-      }
-
-      console.log(`✅ [BG] Finished generating all topics for: "${cleanTitle}"`);
-    })();
-
-    return res.json({
-      id: outline._id,
+    // Step 2️⃣ — Add job to the priority queue
+    await priorityOutlineQueue.add("priority-outline-job", {
+      courseId: outline._id,
       courseTitle: cleanTitle,
-      modules: outline.modules,
-      status: "completed",
-      message: "Outline ready. Topic details generation started in background.",
+    });
+
+    console.log(`⚡ [Queue] Added "${cleanTitle}" to priority-outline-generation queue`);
+    res.json({
+      message: "Priority outline queued successfully",
+      courseTitle: cleanTitle,
+      courseId: outline._id,
     });
   } catch (err) {
-    console.error("❌ [Outline] Generation failed:", err.message);
-    return res.status(500).json({ error: "Failed to generate course outline." });
+    console.error("❌ [Priority Outline] Error:", err.message);
+    res.status(500).json({ error: "Failed to queue priority outline generation." });
   }
 });
 

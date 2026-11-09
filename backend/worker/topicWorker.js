@@ -1,57 +1,75 @@
+// backend/workers/topicWorker.js
 require("dotenv").config({ path: "../.env" });
 const { Worker } = require("bullmq");
-const IORedis = require("ioredis");
 const mongoose = require("mongoose");
+const { connection } = require("../queues/courseQueue");
 const { generateTopicDetails } = require("../services/TopicGenerator");
 const TopicDetail = require("../models/TopicDetail");
 
-const connection = new IORedis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-  tls: process.env.REDIS_URL.startsWith("rediss://")
-    ? { rejectUnauthorized: false }
-    : undefined,
-});
+console.log("⚡ Starting Normal Topic Worker...");
 
-mongoose.connect(process.env.MONGODB_URI).then(() => {
-  console.log("✅ MongoDB connected (Topic Worker)");
-});
+// 🧩 MongoDB Connection
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => console.log("✅ MongoDB connected (Topic Worker)"))
+  .catch((e) => {
+    console.error("❌ MongoDB connection failed:", e.message);
+    process.exit(1);
+  });
 
-const worker = new Worker(
-  "topic-generation",
-  async (job) => {
-    const { courseId, courseTitle, moduleTitle, topicTitle } = job.data;
-    console.log(`🧠 [Worker] Generating topic "${topicTitle}"`);
+// 🕓 Utility delay function
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-    const existing = await TopicDetail.findOne({
-      courseTitle,
-      moduleName: moduleTitle,
-      topic: topicTitle,
-    });
-    if (existing) return console.log(`⚠️ [Skip] Duplicate topic: "${topicTitle}"`);
+async function processTopic(job) {
+  const { courseTitle, moduleName, topic } = job.data;
+  console.log(`🧠 [Topic Worker] Generating topic "${topic}" (${moduleName}) , (${courseTitle})`);
 
-    try {
-      const data = await generateTopicDetails(courseTitle, moduleTitle, topicTitle);
-      await TopicDetail.create({
-        courseTitle,
-        moduleName: moduleTitle,
-        topic: topicTitle,
-        text: data.text,
-        videos: data.videos,
-        mcqs: data.mcqs,
-        extraQuestions: data.extraQuestions,
-      });
-
-      console.log(`💾 [DB] Topic saved: "${topicTitle}"`);
-    } catch (err) {
-      console.error(`❌ [Worker] Failed to generate topic "${topicTitle}":`, err.message);
+  try {
+    const existing = await TopicDetail.findOne({ courseTitle, moduleName, topic }).lean();
+    if (existing) {
+      console.log(`⏭️ [Skip] Already exists: "${topic}"`);
+      return { cached: true };
     }
-  },
-  { connection, concurrency: 3 } // 3 at a time safely under Cohere limits
-);
 
-worker.on("completed", (job) =>
-  console.log(`🎉 [Worker] Topic done: ${job.data.topicTitle}`)
-);
-worker.on("failed", (job, err) =>
-  console.error(`💥 [Worker] Topic failed: ${job.data.topicTitle}`, err.message)
-);
+    // ⏳ Add intentional 10-second gap before calling AI
+    console.log("🕒 Waiting 10 seconds before AI request...");
+    await delay(10000);
+
+    const data = await generateTopicDetails(courseTitle, moduleName, topic);
+    if (!data?.text) throw new Error("Generator returned no content.");
+
+    await TopicDetail.updateOne(
+      { courseTitle, moduleName, topic },
+      {
+        $set: {
+          text: Array.isArray(data.text) ? data.text : [String(data.text)],
+          videos: data.videos || [],
+          mcqs: data.mcqs || [],
+          extraQuestions: data.extraQuestions || [],
+          status: "completed",
+          isPriority: false,
+        },
+      },
+      { upsert: true }
+    );
+
+    console.log(`💾 [DB] Topic saved: "${topic}" ✅`);
+    return { success: true };
+  } catch (err) {
+    console.error(`❌ [Topic Worker] Failed "${topic}":`, err.message);
+    await TopicDetail.updateOne(
+      { courseTitle, moduleName, topic },
+      { $set: { status: "failed", isPriority: false } },
+      { upsert: true }
+    );
+    throw err;
+  }
+}
+
+// 🧠 Worker with concurrency control
+new Worker("topic-generation", processTopic, {
+  connection,
+  concurrency: 1, // sequential ensures delay is respected
+});

@@ -17,7 +17,8 @@ router.post("/", async (req, res) => {
     // ✅ Return the saved course object for immediate display
     //    (frontend will prepend it)
     res.status(201).json(newCourse);
-  } catch (error) {
+  } 
+  catch (error) {
     console.error("❌ Error saving course:", error);
     res.status(500).json({ error: "Failed to save course" });
   }
@@ -34,7 +35,8 @@ router.delete("/:id", async (req, res) => {
 
     // ✅ Return deleted course ID for instant frontend removal
     res.json({ message: "Course deleted successfully", id: req.params.id });
-  } catch (error) {
+  } 
+  catch (error) {
     console.error("❌ Error deleting course:", error);
     res.status(500).json({ error: "Failed to delete course" });
   }

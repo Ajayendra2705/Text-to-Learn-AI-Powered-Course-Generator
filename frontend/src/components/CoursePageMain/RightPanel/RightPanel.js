@@ -7,101 +7,127 @@ export default function RightPanel({ selectedItem, courseTitle }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [status, setStatus] = useState("");
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   const contentRef = useRef(null);
+  const pollRef = useRef(null);
 
   useEffect(() => {
     if (!selectedItem) {
       setDetails(null);
+      setStatus("");
       return;
     }
 
     const { moduleTitle, submoduleName } = selectedItem;
+    setLoading(true);
+    setError(null);
+    setDetails(null);
+    setStatus("queued (priority)");
 
-    const fetchDetails = async () => {
-      setLoading(true);
-      setError(null);
-      setDetails(null);
-
+    const queuePriorityTopic = async () => {
       try {
-        const aiRes = await fetch(`${BACKEND_URL}/api/topic_details`, {
+        // 1️⃣ Queue high-priority topic generation
+        const res = await fetch(`${BACKEND_URL}/api/topic_details/priority`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            topic: submoduleName,
+            courseTitle,
             moduleName: moduleTitle,
-            courseTitle: courseTitle,
+            topic: submoduleName,
           }),
         });
 
-        if (!aiRes.ok) throw new Error("Failed to fetch topic details");
+        if (!res.ok) throw new Error(`Failed to queue topic (${res.status})`);
+        const data = await res.json();
+        console.log("⚡ [Frontend] Queued priority topic:", data);
 
-        const aiData = await aiRes.json();
-        setDetails(aiData);
+        if (data.status === "completed" && data.topicDetail) {
+          setDetails(data.topicDetail);
+          setStatus("completed (cached)");
+          setLoading(false);
+          return;
+        }
+
+        // 2️⃣ Start polling for topic generation
+        pollRef.current = setInterval(async () => {
+          try {
+            const checkRes = await fetch(
+              `${BACKEND_URL}/api/topic_details/check/${encodeURIComponent(
+                courseTitle
+              )}/${encodeURIComponent(moduleTitle)}/${encodeURIComponent(
+                submoduleName
+              )}`
+            );
+
+            if (!checkRes.ok) return;
+            const checkData = await checkRes.json();
+
+            if (checkData && checkData.text?.length > 0) {
+              console.log("✅ [Frontend] Topic ready:", checkData);
+              setDetails(checkData);
+              setStatus("completed (priority)");
+              setLoading(false);
+              clearInterval(pollRef.current);
+            } else if (checkData.status === "failed") {
+              setError("Topic generation failed.");
+              setLoading(false);
+              clearInterval(pollRef.current);
+            } else {
+              console.log("⏳ [Frontend] Still generating topic...");
+            }
+          } catch (err) {
+            console.error("Polling error:", err.message);
+          }
+        }, 5000);
       } catch (err) {
-        setError(err.message || "Error fetching topic details");
-      } finally {
+        console.error("❌ [Frontend] Priority queue failed:", err.message);
+        setError(err.message);
         setLoading(false);
       }
     };
 
-    fetchDetails();
+    queuePriorityTopic();
+
+    // 🧹 Cleanup on topic change
+    return () => clearInterval(pollRef.current);
   }, [selectedItem, courseTitle]);
 
+  // 🧾 PDF download
   const downloadPDF = () => {
-    const input = contentRef.current;
-    if (!input) return;
+    if (!contentRef.current) return;
 
-    const originalStyles = input.style.cssText;
-    input.style.color = "black";
-    input.querySelectorAll("*").forEach((el) => (el.style.color = "black"));
-
-    html2canvas(input, { scale: 2 }).then((canvas) => {
-      input.style.cssText = originalStyles;
-      input.querySelectorAll("*").forEach((el) => (el.style.color = ""));
-
+    const node = contentRef.current;
+    html2canvas(node, { scale: 2 }).then((canvas) => {
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
       const imgWidth = 190;
-      const pageHeight = 295;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      let heightLeft = imgHeight;
-      let position = 10;
-
-      pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(`${submoduleName}.pdf`);
+      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+      pdf.save(`${selectedItem.submoduleName}.pdf`);
     });
   };
 
   if (!selectedItem) {
     return (
       <div id="right-panel">
-        <p className="info-text">
-          Select a submodule on the left to see details here.
-        </p>
+        <p className="info-text">Select a submodule to view details.</p>
       </div>
     );
   }
 
-  const { moduleTitle, submoduleName } = selectedItem;
-
   return (
     <div id="right-panel">
-      <h2>
-        {submoduleName}
-      </h2>
+      <h2>{selectedItem.submoduleName}</h2>
 
-      {loading && <p className="loading-text">Loading details...</p>}
+      {loading && (
+        <p className="loading-text">
+          {status.includes("priority")
+            ? "Queued in high-priority worker..."
+            : "Generating topic details..."}
+        </p>
+      )}
       {error && <p className="error-text">{error}</p>}
 
       {details && (
@@ -111,7 +137,9 @@ export default function RightPanel({ selectedItem, courseTitle }) {
           </button>
 
           <div className="topic-details" ref={contentRef}>
-            {details.text?.map((para, i) => <p key={i}>{para}</p>)}
+            {Array.isArray(details.text)
+              ? details.text.map((t, i) => <p key={i}>{t}</p>)
+              : <p>{details.text}</p>}
 
             {details.videos?.length > 0 && (
               <>
@@ -134,13 +162,13 @@ export default function RightPanel({ selectedItem, courseTitle }) {
                 <ul>
                   {details.mcqs.map((mcq, i) => (
                     <li key={i}>
-                      <p><b>Q:</b> {mcq.question}</p>
+                      <b>Q:</b> {mcq.question}
                       <ul>
                         {mcq.options.map((opt, idx) => (
                           <li key={idx}>{opt}</li>
                         ))}
                       </ul>
-                      <p><i>Answer:</i> {mcq.answer}</p>
+                      <i>Answer:</i> {mcq.answer}
                     </li>
                   ))}
                 </ul>

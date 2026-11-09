@@ -4,40 +4,109 @@ import "./LeftPanel.css";
 export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
   const [error, setError] = useState(null);
   const [expandedModules, setExpandedModules] = useState({});
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
     if (!courseTitle) return;
 
-    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+    setModules([]);
+    setError(null);
+    setStatus("loading");
+    setLoading(true);
+
+    let pollInterval;
 
     const fetchOutline = async () => {
-      setLoading(true);
-      setError(null);
-
       try {
-        const res = await fetch(`${BACKEND_URL}/api/generate_outline`, {
+        console.log(`🎓 Checking outline for "${courseTitle}"...`);
+
+        // Step 1️⃣ — Check if outline already exists
+        const checkRes = await fetch(
+          `${BACKEND_URL}/api/generate_outline/check/${encodeURIComponent(courseTitle)}`
+        );
+
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          console.log("🧾 [Check] Response:", checkData);
+
+          if (
+            checkData.status === "completed" &&
+            Array.isArray(checkData.modules) &&
+            checkData.modules.length > 0
+          ) {
+            setModules([...checkData.modules]);
+            setStatus("completed");
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Step 2️⃣ — Queue PRIORITY outline generation
+        console.log("⚡ Requesting PRIORITY outline generation...");
+        const priorityRes = await fetch(`${BACKEND_URL}/api/generate_outline/priority`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ courseTitle }),
         });
 
-        if (!res.ok) throw new Error(`Failed to fetch outline (${res.status})`);
-        const data = await res.json();
-        setModules(data.modules || []);
-      } 
-      catch (err) {
+        if (!priorityRes.ok)
+          throw new Error(`Failed to queue PRIORITY outline (${priorityRes.status})`);
+
+        const priorityData = await priorityRes.json();
+        console.log("🚀 [Queued Priority] Outline generation started:", priorityData);
+        setStatus("queued");
+
+        // Step 3️⃣ — Start polling (to detect when DB is ready)
+        setTimeout(() => {
+          pollInterval = setInterval(async () => {
+            try {
+              const pollRes = await fetch(
+                `${BACKEND_URL}/api/generate_outline/check/${encodeURIComponent(courseTitle)}`
+              );
+              if (!pollRes.ok) return;
+
+              const pollData = await pollRes.json();
+              console.log("🔄 [Polling] Status:", pollData.status);
+
+              if (
+                pollData.status === "completed" &&
+                Array.isArray(pollData.modules) &&
+                pollData.modules.length > 0
+              ) {
+                console.log("✅ Outline ready:", pollData.modules);
+                setModules([...pollData.modules]);
+                setStatus("completed");
+                setLoading(false);
+                clearInterval(pollInterval);
+              } else if (pollData.status === "failed") {
+                setError("Priority outline generation failed.");
+                setLoading(false);
+                clearInterval(pollInterval);
+              } else {
+                setStatus("generating");
+              }
+            } catch (err) {
+              console.error("⚠️ Polling error:", err.message);
+            }
+          }, 5000);
+        }, 2000);
+      } catch (err) {
+        console.error("❌ Fetch failed:", err.message);
         setError(err.message);
-      } 
-      finally {
         setLoading(false);
       }
     };
 
     fetchOutline();
-  }, [courseTitle]);
 
+    // Cleanup polling interval on unmount or course change
+    return () => clearInterval(pollInterval);
+  }, [courseTitle, BACKEND_URL]);
+
+  // 🧱 Toggle module expand/collapse
   const toggleModule = (index) => {
     setExpandedModules((prev) => ({
       ...prev,
@@ -45,58 +114,46 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
     }));
   };
 
+  // 🎯 Submodule click handler
   const handleSubmoduleClick = (e, moduleTitle, submoduleName) => {
     e.stopPropagation();
+    console.log(`🎯 Selected submodule: ${submoduleName}`);
     onSelectSubmodule({ moduleTitle, submoduleName });
   };
 
   return (
-    <nav id="left-panel" aria-label={`${courseTitle}`}>
-      <h2 tabIndex={0}>Modules for: {courseTitle}</h2>
+    <nav id="left-panel">
+      <h2>Modules for: {courseTitle}</h2>
 
-      {loading && <p className="info-text">Loading modules...</p>}
+      {loading && <p className="info-text">Generating outline...</p>}
       {error && <p className="error-text">Error: {error}</p>}
-      {!loading && !error && modules.length === 0 && (
-        <p className="info-text">No modules found.</p>
+      {!loading && modules.length === 0 && !error && (
+        <p className="info-text">No modules yet. Please wait.</p>
       )}
 
       <ul className="modules-list">
         {modules.map((mod, idx) => (
-          <li key={idx}>
+          <li key={mod._id || idx}>
             <strong
-              role="button"
-              tabIndex={0}
               onClick={() => toggleModule(idx)}
-              onKeyDown={(e) =>
-                (e.key === "Enter" || e.key === " ") && toggleModule(idx)
-              }
-              aria-expanded={!!expandedModules[idx]}
               className={`module-title ${expandedModules[idx] ? "active" : ""}`}
             >
-              {mod.title}
+              {mod.title || `Module ${idx + 1}`}
             </strong>
 
-            <ul
-              className={`submodules-list ${
-                expandedModules[idx] ? "expanded" : ""
-              }`}
-            >
-              {mod.submodules.map((sub, i) => (
-                <li
-                  key={i}
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => handleSubmoduleClick(e, mod.title, sub)}
-                  onKeyDown={(e) =>
-                    (e.key === "Enter" || e.key === " ") &&
-                    handleSubmoduleClick(e, mod.title, sub)
-                  }
-                  className="clickable-submodule"
-                >
-                  {sub}
-                </li>
-              ))}
-            </ul>
+            {expandedModules[idx] && mod.submodules && (
+              <ul className="submodules-list">
+                {mod.submodules.map((sub, i) => (
+                  <li
+                    key={`${idx}-${i}`}
+                    className="clickable-submodule"
+                    onClick={(e) => handleSubmoduleClick(e, mod.title, sub)}
+                  >
+                    {sub}
+                  </li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
       </ul>
