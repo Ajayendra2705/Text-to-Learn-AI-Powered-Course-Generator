@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { apiFetch } from "../../../api";
 import Navbar from "../Navbar/Navbar";
 import { auth } from "../../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
@@ -8,7 +9,6 @@ import { useNavigate } from "react-router-dom";
 import Footer from "../Footer/Footer";
 import "./HomePage.css";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 function HomePage() {
   const [user, setUser] = useState(null);
@@ -19,10 +19,12 @@ function HomePage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      // Not logged in → back to login page (otherwise stuck on "Loading user info..." forever)
+      if (!firebaseUser) navigate("/");
       setUser(firebaseUser);
     });
     return () => unsubscribe();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -30,8 +32,10 @@ function HomePage() {
     const fetchCourses = async () => {
       setLoadingCourses(true);
       try {
-        const res = await fetch(`${BACKEND_URL}/api/courses/${user.uid}`);
+        const res = await apiFetch(`/api/courses/${user.uid}`);
         const data = await res.json();
+        // On error the backend returns { error }, which would crash courses.map()
+        if (!res.ok || !Array.isArray(data)) throw new Error(data?.error || "Bad response");
         setCourses(data);
       } 
       catch (err) {
@@ -55,7 +59,7 @@ function HomePage() {
     if (!trimmedCourse) return;
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/courses`, {
+      const res = await apiFetch(`/api/courses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -82,19 +86,14 @@ function HomePage() {
 
   const handleDeleteCourse = async (courseId) => {
     try {
-      await fetch(`${BACKEND_URL}/api/courses/${courseId}`, {
+      const res = await apiFetch(`/api/courses/${courseId}`, {
         method: "DELETE",
       });
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`); // don't hide a course that wasn't deleted
       setCourses((prev) => prev.filter((c) => c._id !== courseId));
     } catch (error) {
       console.error("❌ Error deleting course:", error);
     }
-  };
-
-  const handleCourseClick = (course) => {
-    navigate("/course", {
-      state: { label: course.title, courseId: course._id },
-    });
   };
 
   if (!user) {
@@ -121,7 +120,6 @@ function HomePage() {
           <CourseList
             courses={courses}
             onDelete={handleDeleteCourse}
-            onClick={handleCourseClick}
           />
         )}
       </div>

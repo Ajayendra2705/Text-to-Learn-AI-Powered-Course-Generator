@@ -46,10 +46,10 @@ const TopicDetailSchema = new mongoose.Schema(
   }
 );
 
-// ✅ Ensure no duplicates
-TopicDetailSchema.index(
-  { courseTitle: 1, moduleName: 1, topic: 1 },
-  { unique: true }
-);
+// // ✅ Ensure no duplicates
+// TopicDetailSchema.index(
+//   { courseTitle: 1, moduleName: 1, topic: 1 },
+//   { unique: true }
+// );
 
 module.exports = mongoose.model("TopicDetail", TopicDetailSchema);

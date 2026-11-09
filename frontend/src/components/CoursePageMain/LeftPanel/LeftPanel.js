@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { apiFetch } from "../../../api";
 import "./LeftPanel.css";
 
 export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
@@ -7,7 +8,6 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
   const [status, setStatus] = useState("");
   const [error, setError] = useState(null);
   const [expandedModules, setExpandedModules] = useState({});
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
     if (!courseTitle) return;
@@ -18,16 +18,19 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
     setLoading(true);
 
     let pollInterval;
+    let pollTimeout;
+    let cancelled = false; // set on unmount / course change so late async work doesn't start polling
 
     const fetchOutline = async () => {
       try {
         console.log(`🎓 Checking outline for "${courseTitle}"...`);
 
         // Step 1️⃣ — Check if outline already exists
-        const checkRes = await fetch(
-          `${BACKEND_URL}/api/generate_outline/check/${encodeURIComponent(courseTitle)}`
+        const checkRes = await apiFetch(
+          `/api/generate_outline/check/${encodeURIComponent(courseTitle)}`
         );
 
+        if (cancelled) return;
         if (checkRes.ok) {
           const checkData = await checkRes.json();
           console.log("🧾 [Check] Response:", checkData);
@@ -46,7 +49,7 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
 
         // Step 2️⃣ — Queue PRIORITY outline generation
         console.log("⚡ Requesting PRIORITY outline generation...");
-        const priorityRes = await fetch(`${BACKEND_URL}/api/generate_outline/priority`, {
+        const priorityRes = await apiFetch(`/api/generate_outline/priority`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ courseTitle }),
@@ -56,17 +59,18 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
           throw new Error(`Failed to queue PRIORITY outline (${priorityRes.status})`);
 
         const priorityData = await priorityRes.json();
+        if (cancelled) return;
         console.log("🚀 [Queued Priority] Outline generation started:", priorityData);
         setStatus("queued");
 
         // Step 3️⃣ — Start polling (to detect when DB is ready)
-        setTimeout(() => {
+        pollTimeout = setTimeout(() => {
           pollInterval = setInterval(async () => {
             try {
-              const pollRes = await fetch(
-                `${BACKEND_URL}/api/generate_outline/check/${encodeURIComponent(courseTitle)}`
+              const pollRes = await apiFetch(
+                `/api/generate_outline/check/${encodeURIComponent(courseTitle)}`
               );
-              if (!pollRes.ok) return;
+              if (cancelled || !pollRes.ok) return;
 
               const pollData = await pollRes.json();
               console.log("🔄 [Polling] Status:", pollData.status);
@@ -94,6 +98,7 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
           }, 5000);
         }, 2000);
       } catch (err) {
+        if (cancelled) return;
         console.error("❌ Fetch failed:", err.message);
         setError(err.message);
         setLoading(false);
@@ -102,9 +107,13 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
 
     fetchOutline();
 
-    // Cleanup polling interval on unmount or course change
-    return () => clearInterval(pollInterval);
-  }, [courseTitle, BACKEND_URL]);
+    // Cleanup polling on unmount or course change
+    return () => {
+      cancelled = true;
+      clearTimeout(pollTimeout);
+      clearInterval(pollInterval);
+    };
+  }, [courseTitle]);
 
   // 🧱 Toggle module expand/collapse
   const toggleModule = (index) => {
@@ -125,7 +134,15 @@ export default function LeftPanel({ courseTitle, onSelectSubmodule }) {
     <nav id="left-panel">
       <h2>Modules for: {courseTitle}</h2>
 
-      {loading && <p className="info-text">Generating outline...</p>}
+      {loading && (
+        <p className="info-text">
+          {status === "loading"
+            ? "Checking for outline..."
+            : status === "queued"
+            ? "Outline queued..."
+            : "Generating outline..."}
+        </p>
+      )}
       {error && <p className="error-text">Error: {error}</p>}
       {!loading && modules.length === 0 && !error && (
         <p className="info-text">No modules yet. Please wait.</p>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { apiFetch } from "../../api";
 import "./LoginPage.css";
 import { auth, googleProvider } from "../../firebaseConfig";
 import {
@@ -41,7 +42,7 @@ export default function LoginPage() {
       const user = userCredential.user;
 
       // Save user info to your backend
-      await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/users`, {
+      await apiFetch(`/api/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -62,7 +63,7 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/users`, {
+      await apiFetch(`/api/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

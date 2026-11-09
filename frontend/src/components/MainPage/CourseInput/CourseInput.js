@@ -1,7 +1,7 @@
 import React, { useState } from "react";
+import { apiFetch } from "../../../api";
 import "./CourseInput.css";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 function CourseInput({ inputText, setInputText, onAdd, userId }) {
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,7 @@ function CourseInput({ inputText, setInputText, onAdd, userId }) {
 
     try {
       // ✅ 1) Generate AI name (correct endpoint with hyphen)
-      const genRes = await fetch(`${BACKEND_URL}/api/generate-name`, {
+      const genRes = await apiFetch(`/api/generate-name`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userInput: trimmed }),

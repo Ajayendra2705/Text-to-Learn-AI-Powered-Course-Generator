@@ -34,7 +34,9 @@ router.post("/priority", async (req, res) => {
       courseTitle: cleanCourse,
     }).lean();
 
-    if (existing) {
+    // Only a completed topic counts as cached. A "failed" doc must be retried,
+    // otherwise a single AI failure would block that topic forever.
+    if (existing && (existing.status || "completed") === "completed") {
       console.log(`✅ [Cache] Found existing topic: "${cleanTopic}"`);
       return res.json({
         status: existing.status || "completed",
@@ -57,6 +59,11 @@ router.post("/priority", async (req, res) => {
         cached: false,
         message: "Topic already in queue for generation.",
       });
+    }
+
+    // Reset a previously failed doc so frontend polling doesn't instantly see "failed"
+    if (existing && existing.status !== "queued") {
+      await TopicDetail.updateOne({ _id: existing._id }, { $set: { status: "queued" } });
     }
 
     // -----------------------------
@@ -98,9 +105,10 @@ router.get("/check/:courseTitle/:moduleName/:topic", async (req, res) => {
   try {
     const { courseTitle, moduleName, topic } = req.params;
 
-    const cleanCourse = decodeURIComponent(courseTitle).trim();
-    const cleanModule = decodeURIComponent(moduleName).trim();
-    const cleanTopic = decodeURIComponent(topic).trim();
+    // Express already URL-decodes params; decoding twice breaks titles with "%"
+    const cleanCourse = courseTitle.trim();
+    const cleanModule = moduleName.trim();
+    const cleanTopic = topic.trim();
 
     const data = await TopicDetail.findOne({
       courseTitle: cleanCourse,

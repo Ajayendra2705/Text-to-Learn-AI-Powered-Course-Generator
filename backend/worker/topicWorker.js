@@ -1,5 +1,5 @@
 // backend/workers/topicWorker.js
-require("dotenv").config({ path: "../.env" });
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const { Worker } = require("bullmq");
 const mongoose = require("mongoose");
 const { connection } = require("../queues/courseQueue");
@@ -27,7 +27,7 @@ async function processTopic(job) {
   console.log(`🧠 [Topic Worker] Generating topic "${topic}" (${moduleName}) , (${courseTitle})`);
 
   try {
-    const existing = await TopicDetail.findOne({ courseTitle, moduleName, topic }).lean();
+    const existing = await TopicDetail.findOne({ courseTitle, moduleName, topic, status: "completed" }).lean();
     if (existing) {
       console.log(`⏭️ [Skip] Already exists: "${topic}"`);
       return { cached: true };

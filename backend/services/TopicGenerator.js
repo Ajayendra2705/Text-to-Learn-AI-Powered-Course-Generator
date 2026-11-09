@@ -18,7 +18,7 @@ function sanitizeJSON(text) {
       .replace(/\\(?!["\\/bfnrtu])/g, "\\\\")
       .replace(/[“”]/g, '"')
       .replace(/[‘’]/g, "'")
-      .replace(/[\x00-\x1F\x7F]/g, "")
+      .replace(/[\x00-\x1F\x7F]/g, " ") // raw newlines inside strings → space (don't glue words together)
   );
 }
 
@@ -98,14 +98,21 @@ Rules:
     if (firstBrace === -1 || lastBrace === -1)
       throw new Error("Invalid JSON returned by Cohere");
 
-    const cleanedJSON = sanitizeJSON(rawText.substring(firstBrace, lastBrace + 1));
+    const jsonText = rawText.substring(firstBrace, lastBrace + 1);
 
+    // Try the raw JSON first: sanitizing valid JSON can break it
+    // (e.g. “curly quotes” inside a string become unescaped " characters).
     let parsed;
     try {
-      parsed = JSON.parse(cleanedJSON);
-    } catch (err) {
-      console.error("❌ Failed to parse Cohere output:", cleanedJSON);
-      throw err;
+      parsed = JSON.parse(jsonText);
+    } catch {
+      const cleanedJSON = sanitizeJSON(jsonText);
+      try {
+        parsed = JSON.parse(cleanedJSON);
+      } catch (err) {
+        console.error("❌ Failed to parse Cohere output:", cleanedJSON);
+        throw err;
+      }
     }
 
     // ✅ Basic structure validation

@@ -1,5 +1,5 @@
 // backend/queues/priorityCourseQueue.js
-require("dotenv").config({ path: "../.env" });
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const { Queue } = require("bullmq");
 const IORedis = require("ioredis");
 

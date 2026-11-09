@@ -49,6 +49,9 @@ router.post("/", async (req, res) => {
         }
 
         const jobId = `outline_${course._id}`;
+        // A kept failed job with the same id would make add() a silent no-op → remove it first
+        const oldJob = await outlineQueue.getJob(jobId);
+        if (oldJob && (await oldJob.getState()) === "failed") await oldJob.remove();
         await outlineQueue.add(
           "generate-outline",
           { courseId: course._id, courseTitle },

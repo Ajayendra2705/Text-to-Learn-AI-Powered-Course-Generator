@@ -4,14 +4,15 @@ const Course = require("../models/Course");
 
 // ✅ Create (Add) a new course
 router.post("/", async (req, res) => {
-  const { userId, title } = req.body;
+  const userId = req.uid; // from verified token
+  const { title } = req.body;
 
-  if (!userId || !title) {
-    return res.status(400).json({ error: "Missing userId or title" });
+  if (!title || typeof title !== "string" || !title.trim()) {
+    return res.status(400).json({ error: "Missing title" });
   }
 
   try {
-    const newCourse = new Course({ userId, title });
+    const newCourse = new Course({ userId, title: title.trim() });
     await newCourse.save();
 
     // ✅ Return the saved course object for immediate display
@@ -27,7 +28,8 @@ router.post("/", async (req, res) => {
 // ✅ Delete a course by ID
 router.delete("/:id", async (req, res) => {
   try {
-    const deletedCourse = await Course.findByIdAndDelete(req.params.id);
+    // Only the owner can delete their course
+    const deletedCourse = await Course.findOneAndDelete({ _id: req.params.id, userId: req.uid });
 
     if (!deletedCourse) {
       return res.status(404).json({ error: "Course not found" });
@@ -44,8 +46,12 @@ router.delete("/:id", async (req, res) => {
 
 // ✅ Get all courses for a user (newest → oldest)
 router.get("/:userId", async (req, res) => {
+  // Users may only list their own courses
+  if (req.params.userId !== req.uid) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
   try {
-    const courses = await Course.find({ userId: req.params.userId })
+    const courses = await Course.find({ userId: req.uid })
       .sort({ createdAt: -1 }); // ✅ ensures newest first, always
 
     res.json(courses);

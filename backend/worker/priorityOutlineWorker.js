@@ -1,10 +1,11 @@
 // backend/workers/priorityOutlineWorker.js
-require("dotenv").config({ path: "../.env" });
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const { Worker } = require("bullmq");
 const mongoose = require("mongoose");
 const { connection } = require("../queues/priorityCourseQueue");
 const { generateCourseOutline } = require("../services/OutlineGenerator");
 const CourseOutline = require("../models/CourseOutline");
+const { queueTopicsForOutline } = require("../services/queueTopics");
 
 // 🧩 MongoDB connection
 mongoose
@@ -87,17 +88,28 @@ async function processPriorityOutline(job) {
     );
 
     console.log(`✅ [DB] Priority outline saved for "${courseTitle}"`);
+
+    // Step 3b: Pre-generate topics in the background (same as the normal outline worker).
+    // Don't fail the outline job if queueing fails — the outline itself is saved.
+    try {
+      await queueTopicsForOutline(courseTitle, outlineData.modules);
+    } catch (e) {
+      console.error(`⚠️ Could not queue background topics for "${courseTitle}":`, e.message);
+    }
     return { success: true, modules: outlineData.modules };
   } catch (err) {
     const msg = err?.message || "Unknown error";
     console.error(`❌ [Priority Worker] Failed for "${courseTitle}": ${msg}`);
 
-    // Step 4️⃣: Update DB with error details
+    // Step 4️⃣: Update DB with error details.
+    // Only mark "failed" on the last attempt — otherwise the frontend stops
+    // polling even though BullMQ is about to retry.
+    const isLastAttempt = attempt >= (job.opts.attempts || 1);
     await CourseOutline.findOneAndUpdate(
       { courseTitle },
       {
         $set: {
-          status: "failed",
+          status: isLastAttempt ? "failed" : "queued",
           isPriority: true,
           errorLog: {
             message: msg,

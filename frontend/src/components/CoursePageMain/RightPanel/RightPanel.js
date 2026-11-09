@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { apiFetch } from "../../../api";
 import "./RightPanel.css";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -8,9 +9,7 @@ export default function RightPanel({ selectedItem, courseTitle }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState("");
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   const contentRef = useRef(null);
-  const pollRef = useRef(null);
 
   useEffect(() => {
     if (!selectedItem) {
@@ -25,10 +24,16 @@ export default function RightPanel({ selectedItem, courseTitle }) {
     setDetails(null);
     setStatus("queued (priority)");
 
+    // Local to this effect run: if the user clicks another topic while this
+    // request is in flight, the stale request must not start/keep a poll that
+    // would later overwrite the new topic's content.
+    let cancelled = false;
+    let pollInterval;
+
     const queuePriorityTopic = async () => {
       try {
         // 1️⃣ Queue high-priority topic generation
-        const res = await fetch(`${BACKEND_URL}/api/topic_details/priority`, {
+        const res = await apiFetch(`/api/topic_details/priority`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -40,6 +45,7 @@ export default function RightPanel({ selectedItem, courseTitle }) {
 
         if (!res.ok) throw new Error(`Failed to queue topic (${res.status})`);
         const data = await res.json();
+        if (cancelled) return;
         console.log("⚡ [Frontend] Queued priority topic:", data);
 
         if (data.status === "completed" && data.topicDetail) {
@@ -50,29 +56,30 @@ export default function RightPanel({ selectedItem, courseTitle }) {
         }
 
         // 2️⃣ Start polling for topic generation
-        pollRef.current = setInterval(async () => {
+        pollInterval = setInterval(async () => {
           try {
-            const checkRes = await fetch(
-              `${BACKEND_URL}/api/topic_details/check/${encodeURIComponent(
+            const checkRes = await apiFetch(
+              `/api/topic_details/check/${encodeURIComponent(
                 courseTitle
               )}/${encodeURIComponent(moduleTitle)}/${encodeURIComponent(
                 submoduleName
               )}`
             );
 
-            if (!checkRes.ok) return;
+            if (cancelled || !checkRes.ok) return;
             const checkData = await checkRes.json();
+            if (cancelled) return;
 
             if (checkData && checkData.text?.length > 0) {
               console.log("✅ [Frontend] Topic ready:", checkData);
               setDetails(checkData);
               setStatus("completed (priority)");
               setLoading(false);
-              clearInterval(pollRef.current);
+              clearInterval(pollInterval);
             } else if (checkData.status === "failed") {
-              setError("Topic generation failed.");
+              setError("Topic generation failed. Click the topic again to retry.");
               setLoading(false);
-              clearInterval(pollRef.current);
+              clearInterval(pollInterval);
             } else {
               console.log("⏳ [Frontend] Still generating topic...");
             }
@@ -81,6 +88,7 @@ export default function RightPanel({ selectedItem, courseTitle }) {
           }
         }, 5000);
       } catch (err) {
+        if (cancelled) return;
         console.error("❌ [Frontend] Priority queue failed:", err.message);
         setError(err.message);
         setLoading(false);
@@ -90,7 +98,10 @@ export default function RightPanel({ selectedItem, courseTitle }) {
     queuePriorityTopic();
 
     // 🧹 Cleanup on topic change
-    return () => clearInterval(pollRef.current);
+    return () => {
+      cancelled = true;
+      clearInterval(pollInterval);
+    };
   }, [selectedItem, courseTitle]);
 
   // 🧾 PDF download
@@ -101,10 +112,20 @@ export default function RightPanel({ selectedItem, courseTitle }) {
     html2canvas(node, { scale: 2 }).then((canvas) => {
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
+      const margin = 10;
       const imgWidth = 190;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pageContentHeight = pdf.internal.pageSize.getHeight() - margin * 2;
 
-      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+      // Content is usually taller than one A4 page → place the same image on
+      // successive pages, shifted up, so nothing gets cut off.
+      let offset = 0;
+      pdf.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
+      while (imgHeight - offset > pageContentHeight) {
+        offset += pageContentHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", margin, margin - offset, imgWidth, imgHeight);
+      }
       pdf.save(`${selectedItem.submoduleName}.pdf`);
     });
   };
@@ -164,7 +185,7 @@ export default function RightPanel({ selectedItem, courseTitle }) {
                     <li key={i}>
                       <b>Q:</b> {mcq.question}
                       <ul>
-                        {mcq.options.map((opt, idx) => (
+                        {(mcq.options || []).map((opt, idx) => (
                           <li key={idx}>{opt}</li>
                         ))}
                       </ul>

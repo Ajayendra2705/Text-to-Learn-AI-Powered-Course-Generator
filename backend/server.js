@@ -8,20 +8,19 @@ const app = express();
 // --------------------------------------------
 // 🌐 CORS Setup
 // --------------------------------------------
-app.use(
-  cors({
-    origin: [
-      "http://localhost:3000", // local frontend
-      "https://text-to-learn-ai-powered-course-gen.vercel.app", // deployed frontend
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: [
+    "http://localhost:3000", // local frontend
+    "https://text-to-learn-ai-powered-course-gen.vercel.app", // deployed frontend
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
-// Handle preflight requests globally
-app.options("*", cors());
+// Handle preflight requests globally (same restrictions as above)
+app.options("*", cors(corsOptions));
 
 // --------------------------------------------
 // 🧱 Middleware
@@ -63,11 +62,14 @@ const coursesRoute = require("./routes/courses");
 const generateNameRoute = require("./routes/generate_name"); // POST /api/generate-name
 const generateOutlineRoute = require("./routes/generate_outline"); // GET /api/generate_outline/check/:courseTitle
 const topicDetailsRoute = require("./routes/topic_details"); // POST /api/topic_details/priority + GET /api/topic_details/check
-const topicCheckRoute = require("./routes/topic_check"); // For polling topic generation progress
+const { requireAuth } = require("./middleware/auth");
 
 // --------------------------------------------
 // 🧠 API Routes — Organized by Functionality
 // --------------------------------------------
+
+// 🔒 Every /api route requires a valid Firebase login (protects user data and AI credits)
+app.use("/api", requireAuth);
 
 // 👤 User Management
 app.use("/api/users", usersRoute);
@@ -83,7 +85,6 @@ app.use("/api/generate_outline", generateOutlineRoute);
 
 // 🧠 Topic Details (normal + priority)
 app.use("/api/topic_details", topicDetailsRoute);
-app.use("/api/topic_check", topicCheckRoute);
 
 // --------------------------------------------
 // ❌ 404 Route (Not Found)

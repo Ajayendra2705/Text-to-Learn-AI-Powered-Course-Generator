@@ -1,4 +1,4 @@
-require("dotenv").config({ path: "../.env" });
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const { Worker } = require("bullmq");
 const mongoose = require("mongoose");
 const { connection } = require("../queues/priorityCourseQueue");
@@ -45,11 +45,12 @@ async function processPriorityTopic(job) {
   console.log(`🧠 [Priority Worker] Generating topic "${topicTitle}"`);
 
   try {
-    // ✅ Check if topic already exists
+    // ✅ Check if topic already exists (a failed/queued doc should be regenerated)
     const existing = await TopicDetail.findOne({
       courseTitle,
       moduleName: moduleTitle,
       topic: topicTitle,
+      status: "completed",
     });
 
     if (existing) {

@@ -1,11 +1,11 @@
 // backend/queues/courseQueue.js
-require("dotenv").config({ path: "../.env" });
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const { Queue } = require("bullmq");
 const IORedis = require("ioredis");
 
 const connection = new IORedis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
-  tls: process.env.REDIS_URL.startsWith("rediss://")
+  tls: process.env.REDIS_URL?.startsWith("rediss://")
     ? { rejectUnauthorized: false }
     : undefined,
 });

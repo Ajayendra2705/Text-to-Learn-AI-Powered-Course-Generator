@@ -1,10 +1,10 @@
-require("dotenv").config({ path: "../.env" });
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const { Worker } = require("bullmq");
 const mongoose = require("mongoose");
-const { connection, topicQueue } = require("../queues/courseQueue");
+const { connection } = require("../queues/courseQueue");
 const { generateCourseOutline } = require("../services/OutlineGenerator");
+const { queueTopicsForOutline } = require("../services/queueTopics");
 const CourseOutline = require("../models/CourseOutline");
-const TopicDetail = require("../models/TopicDetail");
 
 console.log("⚡ Starting Normal Outline Worker...");
 
@@ -63,36 +63,7 @@ async function processOutline(job) {
     );
 
     // Step 5: Queue topic generation jobs (only if not existing)
-    let enqueued = 0;
-    for (const mod of normalizedModules) {
-      const moduleName = mod.title;
-      for (const topic of mod.submodules) {
-        // ensure non-empty strings
-        if (!topic || typeof topic !== "string") continue;
-
-        const existing = await TopicDetail.findOne({
-          courseTitle,
-          moduleName,
-          topic,
-        }).lean();
-
-        if (!existing) {
-          await topicQueue.add(
-            "generate-topic",
-            { courseTitle, moduleName, topic },
-            { removeOnComplete: true }
-          );
-          enqueued++;
-        } 
-        else {
-          console.log(`⏭️ [Skip] Topic already exists: "${topic}" (${moduleName})`);
-        }
-      }
-    }
-
-    console.log(
-      `🚀 [Outline Worker] Queued ${enqueued} new topics for "${courseTitle}"`
-    );
+    const enqueued = await queueTopicsForOutline(courseTitle, normalizedModules);
 
     return { success: true, queued: enqueued };
   } catch (err) {
