@@ -4,7 +4,10 @@ const router = express.Router();
 const User = require("../models/User");
 
 router.post("/", async (req, res) => {
-  const { uid, email, displayName } = req.body;
+  // uid/email come from the verified token, not the request body (can't sync as someone else)
+  const uid = req.uid;
+  const email = req.email || req.body.email;
+  const { displayName } = req.body;
   if (!uid || !email) {
     return res.status(400).json({ error: "Missing uid or email" });
   }

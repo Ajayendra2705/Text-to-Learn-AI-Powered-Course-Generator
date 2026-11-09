@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Navigate } from "react-router-dom";
 import LeftPanel from "../LeftPanel/LeftPanel";
 import RightPanel from "../RightPanel/RightPanel";
 import "./CoursePage.css";
@@ -11,6 +11,9 @@ export default function CoursePage() {
 
   // selected item now contains { module, submodule }
   const [selectedItem, setSelectedItem] = useState(null);
+
+  // Opened directly (e.g. typed URL / new tab) → no course in router state
+  if (!courseTitle) return <Navigate to="/home" replace />;
 
   return (
     <div className="course-page-container" style={{ display: "flex", height: "100vh" }}>

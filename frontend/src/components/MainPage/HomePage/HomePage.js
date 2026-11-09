@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { apiFetch } from "../../../api";
 import Navbar from "../Navbar/Navbar";
 import { auth } from "../../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
@@ -8,7 +9,6 @@ import { useNavigate } from "react-router-dom";
 import Footer from "../Footer/Footer";
 import "./HomePage.css";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 function HomePage() {
   const [user, setUser] = useState(null);
@@ -17,37 +17,31 @@ function HomePage() {
   const [loadingCourses, setLoadingCourses] = useState(false);
   const navigate = useNavigate();
 
-  // ✅ Track Firebase authentication state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      // Not logged in → back to login page (otherwise stuck on "Loading user info..." forever)
+      if (!firebaseUser) navigate("/");
       setUser(firebaseUser);
     });
     return () => unsubscribe();
-  }, []);
+  }, [navigate]);
 
-  // ✅ Fetch user's saved courses
   useEffect(() => {
     if (!user?.uid) return;
 
     const fetchCourses = async () => {
       setLoadingCourses(true);
       try {
-        const res = await fetch(`${BACKEND_URL}/api/courses/${user.uid}`);
-        if (!res.ok) throw new Error(`Failed to fetch courses (${res.status})`);
-
+        const res = await apiFetch(`/api/courses/${user.uid}`);
         const data = await res.json();
-
-        // ✅ Always ensure we store an array
-        if (Array.isArray(data)) {
-          setCourses(data);
-        } else {
-          console.warn("⚠️ Backend returned non-array response for courses:", data);
-          setCourses([]);
-        }
-      } catch (err) {
-        console.error("❌ Error fetching courses:", err.message);
-        setCourses([]); // fallback to empty list
-      } finally {
+        // On error the backend returns { error }, which would crash courses.map()
+        if (!res.ok || !Array.isArray(data)) throw new Error(data?.error || "Bad response");
+        setCourses(data);
+      } 
+      catch (err) {
+        console.error("❌ Error fetching courses:", err);
+      } 
+      finally {
         setLoadingCourses(false);
       }
     };
@@ -55,7 +49,6 @@ function HomePage() {
     fetchCourses();
   }, [user?.uid]);
 
-  // ✅ Add a new course
   const handleAddCourse = async (payload) => {
     const titleRaw =
       typeof payload === "string"
@@ -66,7 +59,7 @@ function HomePage() {
     if (!trimmedCourse) return;
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/courses`, {
+      const res = await apiFetch(`/api/courses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -76,53 +69,31 @@ function HomePage() {
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
+        const errData = await res.json();
         throw new Error(errData.error || "Failed to add course");
       }
 
       const newCourse = await res.json();
-      if (newCourse && newCourse._id) {
-        setCourses((prev) => [newCourse, ...prev]);
-      }
+
+      setCourses((prev) => [newCourse, ...prev]);
 
       setInputText("");
-    } catch (error) {
-      console.error("❌ Error saving course to DB:", error.message);
+    } 
+    catch (error) {
+      console.error("❌ Error saving course to DB:", error);
     }
   };
 
-  // ✅ Delete course and cancel any queued background tasks
   const handleDeleteCourse = async (courseId) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/courses/${courseId}`, {
+      const res = await apiFetch(`/api/courses/${courseId}`, {
         method: "DELETE",
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to delete course");
-      }
-
-      // remove locally
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`); // don't hide a course that wasn't deleted
       setCourses((prev) => prev.filter((c) => c._id !== courseId));
-
-      // 🧹 Tell backend to clean up queue
-      await fetch(`${BACKEND_URL}/api/queue/cleanup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId }),
-      });
-
-      console.log(`🧹 [Cleanup] Queue cleanup triggered for course ${courseId}`);
     } catch (error) {
-      console.error("❌ Error deleting course:", error.message);
+      console.error("❌ Error deleting course:", error);
     }
-  };
-
-  const handleCourseClick = (course) => {
-    navigate("/course", {
-      state: { label: course.title, courseId: course._id },
-    });
   };
 
   if (!user) {
@@ -147,9 +118,8 @@ function HomePage() {
           <p className="loading-text">Loading courses...</p>
         ) : (
           <CourseList
-            courses={Array.isArray(courses) ? courses : []}
+            courses={courses}
             onDelete={handleDeleteCourse}
-            onClick={handleCourseClick}
           />
         )}
       </div>

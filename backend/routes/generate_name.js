@@ -1,78 +1,74 @@
+// backend/routes/generate_name.js
 const express = require("express");
 const router = express.Router();
 const { generateCourseName } = require("../services/NameGenerator");
-const { outlineQueue } = require("../queues/courseQueue");
 const CourseOutline = require("../models/CourseOutline");
+const { outlineQueue } = require("../queues/courseQueue");
 
+/**
+ * POST /api/generate-name
+ * → Return AI name immediately; queue outline in background.
+ */
 router.post("/", async (req, res) => {
-  const { userInput } = req.body;
-
-  // 🧩 Validate user input
-  if (!userInput || typeof userInput !== "string" || !userInput.trim()) {
-    return res.status(400).json({ error: "Invalid or empty input provided." });
-  }
-
-  const cleanInput = userInput.trim();
-  console.log(`🎓 [Input] Topic received: "${cleanInput}"`);
-
   try {
-    // 🧠 Generate course name suggestion via AI
-    const nameResult = await generateCourseName(cleanInput);
-    const finalTitle = nameResult?.suggestion?.trim() || cleanInput;
-    console.log(`🧠 [AI] Suggested course name: "${finalTitle}"`);
-
-    // 🧩 Check if the course already exists
-    let course = await CourseOutline.findOne({ courseTitle: finalTitle });
-
-    if (course) {
-      console.log(`🟡 [Cache] Existing course found: "${finalTitle}"`);
-      return res.json({
-        suggestion: finalTitle,
-        id: course._id,
-        status: course.status,
-        modules: course.modules || [],
-      });
+    const { userInput } = req.body;
+    if (!userInput || typeof userInput !== "string" || !userInput.trim()) {
+      return res.status(400).json({ error: "Invalid or empty input provided." });
     }
 
-    // 🆕 Create placeholder in DB
-    course = await CourseOutline.create({
-      courseTitle: finalTitle,
-      modules: [],
-      status: "queued",
+    const cleanInput = userInput.trim();
+    const nameData = await generateCourseName(cleanInput);
+    const courseTitle = nameData?.suggestion?.trim();
+    if (!courseTitle) return res.status(500).json({ error: "Failed to generate a valid course title." });
+
+    // ✅ respond immediately with the name
+    res.json({
+      suggestion: courseTitle,
+      message: "Name generated. Outline will be queued in background.",
     });
 
-    // ✅ Use a unique jobId so duplicate jobs are prevented
-    const jobId = `outline_${course._id.toString()}`;
+    // 🧠 background: ensure doc + queue outline
+    process.nextTick(async () => {
+      try {
+        let course = await CourseOutline.findOne({ courseTitle });
+        if (!course) {
+          course = await CourseOutline.create({
+            courseTitle,
+            modules: [],
+            status: "queued",
+            isPriority: false,
+          });
+          console.log(`💾 [DB] Created course "${courseTitle}"`);
+        } 
+        else if (["completed", "generating"].includes(course.status)) {
+          console.log(`⏭️ [Skip] Outline already ${course.status} for "${courseTitle}"`);
+          return;
+        } 
+        else {
+          await CourseOutline.findByIdAndUpdate(course._id, { $set: { status: "queued", isPriority: false } });
+        }
 
-    // 🚀 Add to queue (background generation)
-    await outlineQueue.add(
-      "generate-outline",
-      {
-        courseId: course._id.toString(),
-        courseTitle: finalTitle,
-      },
-      {
-        jobId, // prevents duplicates
-        removeOnComplete: true,
-        removeOnFail: false,
-        priority: 5, // normal priority
+        const jobId = `outline_${course._id}`;
+        // A kept failed job with the same id would make add() a silent no-op → remove it first
+        const oldJob = await outlineQueue.getJob(jobId);
+        if (oldJob && (await oldJob.getState()) === "failed") await oldJob.remove();
+        await outlineQueue.add(
+          "generate-outline",
+          { courseId: course._id, courseTitle },
+          { jobId, removeOnComplete: true }
+        );
+        console.log(`🚀 [Queue] Outline queued for "${courseTitle}"`);
+      } 
+      catch (e) {
+        console.error("❌ [Background outline queue] Error:", e.message);
       }
-    );
-
-    console.log(`🚀 [Queue] Outline job queued for "${finalTitle}"`);
-
-    // ✅ Respond back to frontend
-    return res.json({
-      suggestion: finalTitle,
-      id: course._id,
-      status: "queued",
-      message:
-        "Course name generated successfully. Outline generation queued in background.",
     });
-  } catch (err) {
-    console.error("❌ [API] Error in generate_name:", err.message);
-    return res.status(500).json({ error: "Failed to generate course name." });
+  } 
+  catch (err) {
+    console.error("❌ [Generate Name] Error:", err.message);
+    res.status(500).json({ error: "Failed to generate course name." });
   }
 });
 
 module.exports = router;
+ 

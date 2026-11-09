@@ -1,145 +1,87 @@
-require("dotenv").config({ path: "../.env" });
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const { Worker } = require("bullmq");
-const IORedis = require("ioredis");
 const mongoose = require("mongoose");
+const { connection } = require("../queues/courseQueue");
 const { generateCourseOutline } = require("../services/OutlineGenerator");
-const {
-  topicQueue,
-  priorityTopicQueue,
-} = require("../queues/courseQueue");
+const { queueTopicsForOutline } = require("../services/queueTopics");
 const CourseOutline = require("../models/CourseOutline");
-const TopicDetail = require("../models/TopicDetail");
 
-// ----------------------
-// 🔗 Redis Connection
-// ----------------------
-const connection = new IORedis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-  tls: process.env.REDIS_URL.startsWith("rediss://")
-    ? { rejectUnauthorized: false }
-    : undefined,
-});
+console.log("⚡ Starting Normal Outline Worker...");
 
-// ----------------------
 // 🧠 MongoDB Connection
-// ----------------------
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log("✅ MongoDB connected (Outline Worker)"))
-  .catch((err) => {
-    console.error("❌ MongoDB connection failed:", err.message);
+  .catch((e) => {
+    console.error("❌ MongoDB connection failed:", e.message);
     process.exit(1);
   });
 
-// ----------------------
-// ⚙️ Common Job Handler
-// ----------------------
-async function processOutlineJob(job, queueType) {
+// 🧠 Worker Logic
+async function processOutline(job) {
   const { courseId, courseTitle } = job.data;
-  const priority = job.opts.priority || (queueType === "PRIORITY" ? 1 : 5);
-
-  console.log(
-    `⚙️ [${queueType}] Generating outline for "${courseTitle}" (priority ${priority})`
-  );
-
-  const course = await CourseOutline.findById(courseId);
-  if (!course) throw new Error(`Course not found for ID: ${courseId}`);
-
-  await CourseOutline.findByIdAndUpdate(courseId, {
-    $set: { status: queueType === "PRIORITY" ? "prioritized" : "generating" },
-  });
+  console.log(`⚙️ [Outline Worker] Generating outline for "${courseTitle}"`);
 
   try {
-    // 🧠 Generate Outline via Cohere
-    const outlineData = await generateCourseOutline(courseTitle);
-
-    // 💾 Save Outline in Database
+    // Step 1: Mark status as generating
     await CourseOutline.findByIdAndUpdate(courseId, {
-      $set: { modules: outlineData.modules, status: "completed" },
+      $set: { status: "generating", isPriority: false },
     });
 
-    console.log(`✅ [${queueType}] Outline completed for "${courseTitle}"`);
+    // Step 2: Generate outline from AI
+    const outlineData = await generateCourseOutline(courseTitle);
+    if (!outlineData || !outlineData.modules?.length)
+      throw new Error("Empty outline returned by generator.");
 
-    // 🧩 Queue Topic Generation (inherits priority)
-    let queuedCount = 0;
-    const queue = queueType === "PRIORITY" ? priorityTopicQueue : topicQueue;
+    // Step 3: Normalize structure (AI outputs vary)
+    const normalizedModules = outlineData.modules.map((mod, i) => ({
+      title:
+        mod.title?.trim() ||
+        mod.moduleTitle?.trim() ||
+        `Module ${i + 1}`,
+      submodules:
+        mod.submodules?.length
+          ? mod.submodules
+          : mod.topics?.length
+          ? mod.topics
+          : mod.sections?.length
+          ? mod.sections
+          : [],
+    }));
 
-    for (const mod of outlineData.modules) {
-      for (const sub of mod.submodules) {
-        // ✅ Skip if topic already exists in DB
-        const existing = await TopicDetail.findOne({
-          courseTitle,
-          moduleName: mod.title,
-          topic: sub,
-        });
-        if (existing) {
-          console.log(`⚠️ [${queueType}] Skipping existing topic "${sub}"`);
-          continue;
-        }
-
-        // ✅ Unique Job ID — prevents duplicates in queue
-        const jobId = `${courseTitle}_${mod.title}_${sub}`
-          .replace(/[^a-zA-Z0-9_-]/g, "_")
-          .substring(0, 150); // prevent long IDs
-
-        // ✅ Add to the correct queue
-        await queue.add(
-          "generate-topic",
-          {
-            courseId,
-            courseTitle,
-            moduleTitle: mod.title,
-            topicTitle: sub,
-          },
-          {
-            jobId,
-            priority,
-            removeOnComplete: true, // auto cleanup
-            removeOnFail: true,     // cleanup failed jobs after logging
-            attempts: 2,
-          }
-        );
-
-        queuedCount++;
-      }
-    }
+    // Step 4: Save normalized outline to Mongo
+    await CourseOutline.findByIdAndUpdate(courseId, {
+      $set: {
+        modules: normalizedModules,
+        status: "completed",
+        isPriority: false,
+      },
+    });
 
     console.log(
-      `🧩 [${queueType}] Queued ${queuedCount} new topics for "${courseTitle}"`
+      `✅ [DB] Outline saved for "${courseTitle}" with ${normalizedModules.length} modules`
     );
+
+    // Step 5: Queue topic generation jobs (only if not existing)
+    const enqueued = await queueTopicsForOutline(courseTitle, normalizedModules);
+
+    return { success: true, queued: enqueued };
   } catch (err) {
-    console.error(`❌ [${queueType}] Outline generation failed:`, err.message);
+    console.error(
+      `❌ [Outline Worker] Failed for "${courseTitle}":`,
+      err.message
+    );
+
     await CourseOutline.findByIdAndUpdate(courseId, {
       $set: { status: "failed" },
     });
+
+    throw err;
   }
 }
 
-// ----------------------
-// 🧠 Workers
-// ----------------------
-
-// 🕓 Normal background outline jobs
-new Worker(
-  "outline-generation",
-  async (job) => await processOutlineJob(job, "NORMAL"),
-  { connection, concurrency: 2 }
-);
-
-// ⚡ High-priority outline jobs
-new Worker(
-  "priority-outline-generation",
-  async (job) => await processOutlineJob(job, "PRIORITY"),
-  { connection, concurrency: 2 }
-);
-
-// ----------------------
-// 🎯 Cleanup
-// ----------------------
-process.on("SIGINT", async () => {
-  console.log("\n🧹 Shutting down Outline Worker...");
-  await connection.quit();
-  await mongoose.disconnect();
-  console.log("👋 Worker stopped cleanly");
-  process.exit(0);
+// 🧩 Create BullMQ Worker
+new Worker("outline-generation", processOutline, {
+  connection,
+  concurrency: 2,
 });

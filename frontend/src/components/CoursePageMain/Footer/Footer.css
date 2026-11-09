@@ -1,22 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap');
+
+/* ===============================
+   💎 Footer Container
+   =============================== */
 .footer {
-  background-color: #222;       /* Dark background */
-  color: #fff;                  /* White text */
-  text-align: center;           /* Center text */
-  padding: 15px 0;              /* Vertical padding */
-  font-size: 14px;               /* Small, clean font size */
-  position: fixed;               /* Stick to bottom */
+  position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Soft shadow above */
-}
-
-.footer p {
-  margin: 0;                     /* Remove default paragraph margin */
+  background: rgba(30, 32, 45, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #e5e9f5;
+  text-align: center;
+  padding: 12px 0;
+  font-size: 0.9rem;
   font-family: "Segoe UI", sans-serif;
   letter-spacing: 0.5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.25);
+  z-index: 1000;
+  animation: fadeInFooter 0.8s ease-out forwards;
+  opacity: 0;
 }
 
+/* ===============================
+   ✍️ Footer Text
+   =============================== */
+.footer p {
+  margin: 0;
+  color: #d0d6e8;
+  text-shadow: 0 0 10px rgba(74, 163, 255, 0.15);
+  font-weight: 500;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.footer p:hover {
+  color: #7db7ff;
+  text-shadow: 0 0 14px rgba(74, 163, 255, 0.35);
+}
+
+/* Heart Accent */
 .footer p span {
-  color: #ff4d4d;                 /* Heart color */
+  color: #ff4d6d;
+  font-weight: 600;
+  transition: transform 0.3s ease, text-shadow 0.3s ease;
+  display: inline-block;
+}
+
+.footer p span:hover {
+  transform: scale(1.25);
+  text-shadow: 0 0 12px rgba(255, 77, 109, 0.5);
+}
+
+/* ===============================
+   ✨ Animations
+   =============================== */
+@keyframes fadeInFooter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===============================
+   📱 Responsive
+   =============================== */
+@media (max-width: 768px) {
+  .footer {
+    font-size: 0.8rem;
+    padding: 10px 0;
+    backdrop-filter: blur(10px);
+  }
 }

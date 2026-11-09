@@ -1,155 +1,242 @@
-/* Container styling */
+@import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap');
+
+/* ===============================
+   🧠 Right Panel Main Container
+   =============================== */
 #right-panel {
   flex: 1;
   height: 100vh;
   overflow-y: auto;
   padding: 2rem 2.5rem;
-  background: linear-gradient(180deg, #1a1c29, #121217);
-  color: #e0e2eb;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: rgba(20, 22, 33, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-left: 1px solid rgba(74, 163, 255, 0.15);
+  box-shadow: inset 0 0 40px rgba(74, 163, 255, 0.05);
+  color: #e0e6f0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   box-sizing: border-box;
-  user-select: text;
   scroll-behavior: smooth;
-  border-left: 2px solid #2a2c3f;
   display: flex;
   flex-direction: column;
+  animation: fadeInPanel 0.8s ease forwards;
+  opacity: 0;
 }
 
-/* Main heading */
+/* ===============================
+   📜 Scrollbar Styling
+   =============================== */
+#right-panel::-webkit-scrollbar {
+  width: 8px;
+}
+#right-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+#right-panel::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  border-radius: 6px;
+}
+#right-panel::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #4aa3ff, #2563eb);
+}
+
+/* ===============================
+   🏷️ Headings
+   =============================== */
 #right-panel h2 {
-  font-size: 2.2rem;
+  font-size: 2.1rem;
   font-weight: 700;
-  margin-bottom: 1.6rem;
+  margin-bottom: 1.4rem;
   color: #7db7ff;
-  letter-spacing: 0.02em;
-  text-align: left;
-  user-select: text;
-  border-bottom: 2px solid #3a70c1;
+  border-bottom: 2px solid rgba(74, 163, 255, 0.25);
   padding-bottom: 0.3rem;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 12px rgba(74, 163, 255, 0.3);
+  animation: slideIn 0.5s ease forwards;
 }
 
-/* Secondary headings for sections */
 #right-panel h3 {
-  font-size: 1.4rem;
-  margin-top: 2.4rem;
+  font-size: 1.3rem;
+  margin-top: 2.2rem;
   margin-bottom: 1rem;
   font-weight: 600;
-  color: #9bb1db;
-  border-bottom: 1px solid #3a70c1;
-  padding-bottom: 0.25rem;
-  user-select: text;
+  color: #9bb7f0;
+  border-left: 3px solid rgba(74, 163, 255, 0.35);
+  padding-left: 10px;
+  letter-spacing: 0.02em;
+  animation: fadeIn 0.8s ease both;
 }
 
-/* Paragraphs */
+/* ===============================
+   ✍️ Text & Lists
+   =============================== */
 #right-panel p {
   font-size: 1rem;
-  line-height: 1.6;
-  margin-bottom: 1.2rem;
-  color: #c3c6d9;
-  user-select: text;
-}
-
-/* Lists styling */
-#right-panel ul {
-  list-style-type: disc;
-  margin-left: 1.8rem;
-  margin-bottom: 1.5rem;
-  padding-left: 0;
-  color: #c3c6d9;
-}
-
-/* Nested lists (e.g. MCQ options) */
-#right-panel ul ul {
-  list-style-type: circle;
-  margin-left: 1.5rem;
-  margin-top: 0.4rem;
-}
-
-/* Links */
-#right-panel a {
-  color: #4a90e2;
-  text-decoration: none;
-  word-break: break-word;
+  line-height: 1.7;
+  margin-bottom: 1.1rem;
+  color: #cfd4e3;
+  text-align: justify;
   transition: color 0.3s ease;
 }
 
-#right-panel a:hover,
-#right-panel a:focus {
-  color: #7db7ff;
-  text-decoration: underline;
+#right-panel ul {
+  list-style-type: disc;
+  margin: 0.8rem 0 1.4rem 1.5rem;
+  color: #cfd4e3;
+}
+#right-panel ul ul {
+  list-style-type: circle;
+  margin-left: 1.5rem;
 }
 
-/* Emphasized text */
+#right-panel a {
+  color: #4aa3ff;
+  text-decoration: none;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
+}
+#right-panel a:hover {
+  color: #7db7ff;
+  text-shadow: 0 0 8px rgba(74, 163, 255, 0.5);
+}
+
+/* Bold and italic text styling */
 #right-panel b {
   color: #e1e4ff;
 }
-
 #right-panel i {
-  color: #a1a8c9;
+  color: #aab2cc;
 }
 
-/* Loading and error messages */
-#right-panel p.loading {
+/* ===============================
+   ⚠️ Status Messages
+   =============================== */
+#right-panel p.loading-text {
   font-style: italic;
-  color: #9a9fb6;
+  color: #9aa3c6;
   text-align: center;
   margin-top: 2rem;
+  animation: pulseGlow 2s infinite ease-in-out;
 }
 
-#right-panel p.error {
+#right-panel p.error-text {
   font-weight: 700;
   color: #ff6b6b;
   text-align: center;
   margin-top: 2rem;
+  text-shadow: 0 0 10px rgba(255, 107, 107, 0.3);
 }
 
-/* Topic details container for better spacing */
+/* ===============================
+   📘 Topic Details
+   =============================== */
 .topic-details {
   margin-top: 1.5rem;
-  padding-bottom: 2rem;
-  border-bottom: 1px solid #2a2c3f;
+  padding: 1.5rem 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  animation: fadeIn 1s ease both;
 }
 
-/* Scrollbar styling */
-#right-panel::-webkit-scrollbar {
-  width: 8px;
+/* ===============================
+   📄 Download Button
+   =============================== */
+.download-btn {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border: none;
+  padding: 10px 18px;
+  margin-bottom: 10px;
+  color: #fff;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 14px rgba(74, 163, 255, 0.35);
+  transition: all 0.25s ease;
 }
 
-#right-panel::-webkit-scrollbar-track {
-  background: #121217;
+.download-btn:hover {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(74, 163, 255, 0.45);
 }
 
-#right-panel::-webkit-scrollbar-thumb {
-  background-color: #3a70c1;
-  border-radius: 5px;
-  border: 2px solid #121217;
+.download-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(74, 163, 255, 0.3);
 }
 
-/* Responsive adjustments */
+/* ===============================
+   ✨ Animations
+   =============================== */
+@keyframes fadeInPanel {
+  0% {
+    opacity: 0;
+    transform: translateX(25px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    color: #9aa3c6;
+    text-shadow: none;
+  }
+  50% {
+    color: #c2ccff;
+    text-shadow: 0 0 8px rgba(74, 163, 255, 0.4);
+  }
+}
+
+/* ===============================
+   📱 Responsive Design
+   =============================== */
 @media (max-width: 768px) {
   #right-panel {
-    padding: 1rem 1.5rem;
+    padding: 1.2rem 1.5rem;
+    border-left: none;
+    border-top: 1px solid rgba(74, 163, 255, 0.15);
+    border-radius: 12px;
+    height: auto;
+    min-height: 100vh;
   }
 
   #right-panel h2 {
-    font-size: 1.7rem;
+    font-size: 1.6rem;
   }
 
   #right-panel h3 {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
   }
-}
 
-.download-btn {
-  background-color: #4cafef;
-  border: none;
-  padding: 8px 14px;
-  margin-bottom: 10px;
-  color: white;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: bold;
-}
-.download-btn:hover {
-  background-color: #2f97da;
+  .download-btn {
+    width: 100%;
+    text-align: center;
+  }
 }
